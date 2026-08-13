@@ -1,9 +1,7 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# Règles Globales - AlbumFacile
 
-# This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
-
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
-
-<!-- END:nextjs-agent-rules -->
+- **Accessibilité Senior (80 ans) :** Toutes les interfaces DOIVENT utiliser de très grandes polices (min 20px par défaut), de forts contrastes, et des textes descriptifs très clairs. Évitez les icônes seules, accompagnez-les toujours de texte explicite.
+- **Architecture :** Utilisez systématiquement l'Atomic Design pour la structure des composants (rangés dans `src/components/`).
+- **Clean Code :** Suivez les principes du Clean Code : nommage descriptif complet, fonctions courtes avec une seule responsabilité.
+- **Technologies :** Privilégiez Material UI (MUI) pour garantir l'accessibilité visuelle.
+- **File System Access API :** Ce projet lit et manipule les fichiers locaux via le navigateur. Toujours gérer de manière claire et bienveillante les permissions demandées à l'utilisateur.
