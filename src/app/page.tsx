@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { get, set } from 'idb-keyval';
-import { Container, Typography, Box, AppBar, Toolbar, Button, Tabs, Tab } from '@mui/material';
+import { Container, Typography, Box, AppBar, Toolbar, Button, Tabs, Tab, CircularProgress } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
 import { scanDirectory, DirectoryData } from '@/utils/fileSystem';
 import ActionButton from '@/components/atoms/ActionButton';
@@ -13,6 +13,8 @@ export default function Home() {
   const [rootDirectory, setRootDirectory] = useState<DirectoryData | null>(null);
   const [savedHandle, setSavedHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [explorerPath, setExplorerPath] = useState<string[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {
     get('root-dir-handle').then(async (handle) => {
@@ -33,38 +35,40 @@ export default function Home() {
     }).catch(console.error);
   }, []);
 
-  const handleSelectFolder = async () => {
+  const handleMainAction = async () => {
+    setIsScanning(true);
     try {
+      if (savedHandle) {
+        // @ts-expect-error - missing global type
+        const permission = await savedHandle.queryPermission({ mode: 'readwrite' });
+        if (permission === 'granted') {
+          const data = await scanDirectory(savedHandle, true);
+          setRootDirectory(data);
+          setIsScanning(false);
+          return;
+        } else {
+          // @ts-expect-error - missing global type
+          const request = await savedHandle.requestPermission({ mode: 'readwrite' });
+          if (request === 'granted') {
+            const data = await scanDirectory(savedHandle, true);
+            setRootDirectory(data);
+            setIsScanning(false);
+            return;
+          }
+        }
+      }
+      
+      // Fallback
       // @ts-expect-error - API standard mais type global manquant
       const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
       await set('root-dir-handle', dirHandle);
       setSavedHandle(dirHandle);
-      const data = await scanDirectory(dirHandle);
+      const data = await scanDirectory(dirHandle, true);
       setRootDirectory(data);
     } catch (err) {
       console.error(err);
     }
-  };
-
-  const handleResumeFolder = async () => {
-    if (!savedHandle) return;
-    try {
-      // @ts-expect-error - missing global type
-      const permission = await savedHandle.queryPermission({ mode: 'readwrite' });
-      if (permission === 'granted') {
-        const data = await scanDirectory(savedHandle);
-        setRootDirectory(data);
-      } else {
-        // @ts-expect-error - missing global type
-        const request = await savedHandle.requestPermission({ mode: 'readwrite' });
-        if (request === 'granted') {
-          const data = await scanDirectory(savedHandle);
-          setRootDirectory(data);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    }
+    setIsScanning(false);
   };
 
   const toggleFolderInclude = (dirData: DirectoryData, targetName: string): DirectoryData => {
@@ -113,33 +117,14 @@ export default function Home() {
     setRootDirectory(prev => prev ? handleSetAllInclusion(prev, targetHandle, false) : null);
   };
 
-  const replaceDirectoryNode = (root: DirectoryData, targetHandle: FileSystemDirectoryHandle, newData: DirectoryData): DirectoryData => {
-    if (root.handle === targetHandle) {
-      return { ...newData, included: root.included };
-    }
-    const newChildren = root.children.map(child => {
-      if (child.kind === 'directory') {
-        return replaceDirectoryNode(child as DirectoryData, targetHandle, newData);
-      }
-      return child;
-    });
-    return { ...root, children: newChildren };
-  };
-
-  const handleLoadFolder = async (dir: DirectoryData) => {
-    if (!rootDirectory) return;
-    try {
-      const scannedDir = await scanDirectory(dir.handle, false);
-      setRootDirectory(prev => prev ? replaceDirectoryNode(prev, dir.handle, scannedDir) : null);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  // onLoadFolder removed as directories are now deeply scanned on first load
 
   const handleRefresh = async () => {
     if (rootDirectory) {
-      const data = await scanDirectory(rootDirectory.handle);
+      setIsScanning(true);
+      const data = await scanDirectory(rootDirectory.handle, true);
       setRootDirectory(data);
+      setIsScanning(false);
     }
   };
 
@@ -150,6 +135,11 @@ export default function Home() {
           <HomeIcon sx={{ fontSize: 40, mr: 2, color: 'white' }} />
           <Typography variant="h1" component="div" sx={{ color: 'white', flexGrow: 1 }}>
             TriHouse
+            {rootDirectory && (
+              <Typography variant="body2" component="span" sx={{ ml: 3, opacity: 0.9 }}>
+                ({rootDirectory.imageCount} image(s), {rootDirectory.videoCount} vidéo(s) au total)
+              </Typography>
+            )}
           </Typography>
           {rootDirectory && (
             <Box sx={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -191,18 +181,16 @@ export default function Home() {
               Nous allons vous aider à tout ranger par année très facilement.
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
-              <ActionButton onClick={handleSelectFolder}>
-                {savedHandle ? "1. Choisir un nouveau dossier à trier" : "1. Sélectionner mon dossier principal (Images)"}
+              <ActionButton onClick={handleMainAction} disabled={isScanning}>
+                {isScanning ? (
+                  <>
+                    <CircularProgress size={24} sx={{ color: 'white', mr: 2 }} />
+                    Comptage en cours...
+                  </>
+                ) : (
+                  "Explorer un dossier"
+                )}
               </ActionButton>
-              
-              {savedHandle && (
-                <ActionButton 
-                  onClick={handleResumeFolder} 
-                  sx={{ bgcolor: '#4caf50', '&:hover': { bgcolor: '#388e3c' } }}
-                >
-                  2. Reprendre le dossier de la dernière fois (On vous demandera d&apos;accepter)
-                </ActionButton>
-              )}
             </Box>
           </Box>
         ) : (
@@ -210,14 +198,21 @@ export default function Home() {
             {activeTab === 0 && (
               <FileExplorer 
                 rootDirectory={rootDirectory} 
+                pathNames={explorerPath}
+                setPathNames={setExplorerPath}
                 onToggleFolder={handleToggleFolder}
-                onLoadFolder={handleLoadFolder}
                 onSelectAll={handleSelectAll}
                 onDeselectAll={handleDeselectAll}
               />
             )}
             {activeTab === 1 && (
-              <DiscoverPage rootDirectory={rootDirectory} />
+              <DiscoverPage 
+                rootDirectory={rootDirectory} 
+                onGoToExplorer={(path) => {
+                  setExplorerPath(path);
+                  setActiveTab(0);
+                }}
+              />
             )}
             {activeTab === 2 && (
               <SortPage 

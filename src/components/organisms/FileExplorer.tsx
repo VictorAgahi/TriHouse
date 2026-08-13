@@ -7,15 +7,14 @@ import FolderCard from '../molecules/FolderCard';
 
 interface FileExplorerProps {
   rootDirectory: DirectoryData;
+  pathNames: string[];
+  setPathNames: React.Dispatch<React.SetStateAction<string[]>>;
   onToggleFolder: (folderName: string) => void;
-  onLoadFolder: (dir: DirectoryData) => Promise<void>;
   onSelectAll: (handle: FileSystemDirectoryHandle) => void;
   onDeselectAll: (handle: FileSystemDirectoryHandle) => void;
 }
 
-export default function FileExplorer({ rootDirectory, onToggleFolder, onLoadFolder, onSelectAll, onDeselectAll }: FileExplorerProps) {
-  // Navigation state: stocke uniquement les noms des dossiers traversés (pour éviter les references mortes)
-  const [pathNames, setPathNames] = useState<string[]>([]);
+export default function FileExplorer({ rootDirectory, pathNames, setPathNames, onToggleFolder, onSelectAll, onDeselectAll }: FileExplorerProps) {
   const [page, setPage] = useState(1);
   const itemsPerPage = 24;
 
@@ -38,14 +37,7 @@ export default function FileExplorer({ rootDirectory, onToggleFolder, onLoadFold
   const currentDir = path[path.length - 1];
   const isRoot = path.length === 1;
 
-  const [loadingFolder, setLoadingFolder] = useState<string | null>(null);
-
   const handleNavigateIn = async (dir: DirectoryData) => {
-    if (dir.scanned === false) {
-      setLoadingFolder(dir.name);
-      await onLoadFolder(dir);
-      setLoadingFolder(null);
-    }
     setPathNames((prev) => [...prev, dir.name]);
     setPage(1);
   };
@@ -89,10 +81,10 @@ export default function FileExplorer({ rootDirectory, onToggleFolder, onLoadFold
             <FolderCard
               name={child.name}
               included={child.included}
-              fileCount={child.fileCount}
+              imageCount={child.imageCount}
+              videoCount={child.videoCount}
               onToggleInclude={() => onToggleFolder(child.name)}
               onClick={() => handleNavigateIn(child as DirectoryData)}
-              isLoading={loadingFolder === child.name}
             />
           </Grid>
         ))}

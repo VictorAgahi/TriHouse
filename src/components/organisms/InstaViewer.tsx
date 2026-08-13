@@ -16,9 +16,10 @@ interface InstaViewerProps {
   initialIndex: number;
   onClose: () => void;
   onDelete: (fileName: string) => void;
+  onExplore: (file: FileData) => void;
 }
 
-const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (name: string) => void, onExplore: () => void }) => {
+const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (name: string) => void, onExplore: (file: FileData) => void }) => {
   const [url, setUrl] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<{ date?: string, location?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,9 +123,10 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
         display: 'flex', 
         flexDirection: 'column', 
         gap: 2,
-        alignItems: 'flex-end'
+        alignItems: 'flex-end',
+        zIndex: 10
       }}>
-        <Fab color="primary" variant="extended" onClick={onExplore}>
+        <Fab color="primary" variant="extended" onClick={() => onExplore(file)}>
           <FolderIcon sx={{ mr: 1 }} />
           Explorer
         </Fab>
@@ -137,7 +139,7 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
   );
 };
 
-export default function InstaViewer({ open, files, initialIndex, onClose, onDelete }: InstaViewerProps) {
+export default function InstaViewer({ open, files, initialIndex, onClose, onDelete, onExplore }: InstaViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
@@ -244,7 +246,7 @@ export default function InstaViewer({ open, files, initialIndex, onClose, onDele
           <>
             <Box sx={{ height: `${Math.max(0, currentIndex - 2) * 100}vh` }} />
             {files.slice(Math.max(0, currentIndex - 2), currentIndex + 3).map((file) => (
-              <MediaSlide key={file.name} file={file} onDelete={onDelete} onExplore={onClose} />
+              <MediaSlide key={file.name} file={file} onDelete={onDelete} onExplore={onExplore} />
             ))}
             <Box sx={{ height: `${Math.max(0, files.length - 1 - (currentIndex + 2)) * 100}vh` }} />
           </>

@@ -4,13 +4,14 @@ import FolderIcon from '@mui/icons-material/Folder';
 interface FolderCardProps {
   name: string;
   included: boolean;
-  fileCount: number;
+  imageCount: number;
+  videoCount: number;
   onToggleInclude: () => void;
   onClick: () => void;
   isLoading?: boolean;
 }
 
-export default function FolderCard({ name, included, fileCount, onToggleInclude, onClick, isLoading }: FolderCardProps) {
+export default function FolderCard({ name, included, imageCount, videoCount, onToggleInclude, onClick, isLoading }: FolderCardProps) {
   return (
     <Card 
       sx={{ 
@@ -51,7 +52,7 @@ export default function FolderCard({ name, included, fileCount, onToggleInclude,
             {name}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {isLoading ? 'Chargement...' : `${fileCount} photo(s)/vidéo(s)`}
+            {isLoading ? 'Chargement...' : `${imageCount} photo(s), ${videoCount} vidéo(s)`}
           </Typography>
         </CardContent>
       </CardActionArea>

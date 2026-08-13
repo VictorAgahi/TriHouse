@@ -6,9 +6,10 @@ import InstaViewer from './InstaViewer';
 
 interface DiscoverPageProps {
   rootDirectory: DirectoryData;
+  onGoToExplorer: (path: string[]) => void;
 }
 
-export default function DiscoverPage({ rootDirectory }: DiscoverPageProps) {
+export default function DiscoverPage({ rootDirectory, onGoToExplorer }: DiscoverPageProps) {
   const [isScanning, setIsScanning] = useState(false);
   const [shuffledFiles, setShuffledFiles] = useState<FileData[]>([]);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -24,10 +25,12 @@ export default function DiscoverPage({ rootDirectory }: DiscoverPageProps) {
       }
       
       const filesData: FileData[] = handles.map(h => ({
-        handle: h,
-        name: h.name,
+        handle: h.handle,
+        name: h.handle.name,
         kind: 'file',
-        year: null
+        year: null,
+        parentHandle: h.parentHandle,
+        folderPath: h.folderPath
       }));
       
       setShuffledFiles(filesData);
@@ -36,6 +39,23 @@ export default function DiscoverPage({ rootDirectory }: DiscoverPageProps) {
       console.error(e);
     }
     setIsScanning(false);
+  };
+
+  const handleDelete = async (fileName: string) => {
+    const file = shuffledFiles.find(f => f.name === fileName);
+    if (!file || !file.parentHandle) return;
+    try {
+      await file.parentHandle.removeEntry(fileName);
+      setShuffledFiles(prev => prev.filter(f => f.name !== fileName));
+    } catch (e) {
+      console.error("Erreur lors de la suppression:", e);
+    }
+  };
+
+  const handleExplore = (file: FileData) => {
+    if (file.folderPath) {
+      onGoToExplorer(file.folderPath);
+    }
   };
 
   return (
@@ -64,7 +84,8 @@ export default function DiscoverPage({ rootDirectory }: DiscoverPageProps) {
         files={shuffledFiles}
         initialIndex={0}
         onClose={() => setViewerOpen(false)}
-        onDelete={() => {}}
+        onDelete={handleDelete}
+        onExplore={handleExplore}
       />
     </Box>
   );
