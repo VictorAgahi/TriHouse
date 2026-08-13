@@ -1,4 +1,4 @@
-import { Card, CardActionArea, CardContent, Typography, Checkbox, FormControlLabel, Box } from '@mui/material';
+import { Card, CardActionArea, CardContent, Typography, Checkbox, FormControlLabel, Box, CircularProgress } from '@mui/material';
 import FolderIcon from '@mui/icons-material/Folder';
 
 interface FolderCardProps {
@@ -7,9 +7,10 @@ interface FolderCardProps {
   fileCount: number;
   onToggleInclude: () => void;
   onClick: () => void;
+  isLoading?: boolean;
 }
 
-export default function FolderCard({ name, included, fileCount, onToggleInclude, onClick }: FolderCardProps) {
+export default function FolderCard({ name, included, fileCount, onToggleInclude, onClick, isLoading }: FolderCardProps) {
   return (
     <Card 
       sx={{ 
@@ -40,12 +41,17 @@ export default function FolderCard({ name, included, fileCount, onToggleInclude,
       </Box>
       <CardActionArea onClick={onClick} sx={{ p: 3 }}>
         <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 0 }}>
-          <FolderIcon sx={{ fontSize: 80, color: included ? 'primary.main' : 'text.secondary', mb: 2 }} />
+          <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+            <FolderIcon sx={{ fontSize: 80, color: included ? 'primary.main' : 'text.secondary' }} />
+            {isLoading && (
+              <CircularProgress size={40} sx={{ position: 'absolute', color: 'primary.main' }} />
+            )}
+          </Box>
           <Typography variant="body1" noWrap sx={{ fontWeight: 'bold', mb: 0.5 }}>
             {name}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {fileCount} photo{fileCount > 1 ? 's' : ''}/vidéo{fileCount > 1 ? 's' : ''}
+            {isLoading ? 'Chargement...' : `${fileCount} photo(s)/vidéo(s)`}
           </Typography>
         </CardContent>
       </CardActionArea>

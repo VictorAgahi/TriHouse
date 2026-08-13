@@ -128,9 +128,11 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
 
 export default function InstaViewer({ open, files, initialIndex, onClose, onDelete }: InstaViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
   useEffect(() => {
     if (open && containerRef.current && initialIndex >= 0) {
+      setCurrentIndex(initialIndex);
       // Scroll to initial index
       setTimeout(() => {
         if (containerRef.current) {
@@ -142,6 +144,14 @@ export default function InstaViewer({ open, files, initialIndex, onClose, onDele
       }, 50);
     }
   }, [open, initialIndex]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const top = e.currentTarget.scrollTop;
+    const index = Math.round(top / window.innerHeight);
+    if (index !== currentIndex) {
+      setCurrentIndex(index);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -210,6 +220,7 @@ export default function InstaViewer({ open, files, initialIndex, onClose, onDele
 
       <Box 
         ref={containerRef}
+        onScroll={handleScroll}
         sx={{ 
           height: '100vh', 
           overflowY: 'auto', 
@@ -218,9 +229,15 @@ export default function InstaViewer({ open, files, initialIndex, onClose, onDele
           '&::-webkit-scrollbar': { display: 'none' } // Hide scrollbar for Chrome
         }}
       >
-        {files.map((file) => (
-          <MediaSlide key={file.name} file={file} onDelete={onDelete} onExplore={onClose} />
-        ))}
+        {files.length > 0 && (
+          <>
+            <Box sx={{ height: `${Math.max(0, currentIndex - 2) * 100}vh` }} />
+            {files.slice(Math.max(0, currentIndex - 2), currentIndex + 3).map((file) => (
+              <MediaSlide key={file.name} file={file} onDelete={onDelete} onExplore={onClose} />
+            ))}
+            <Box sx={{ height: `${Math.max(0, files.length - 1 - (currentIndex + 2)) * 100}vh` }} />
+          </>
+        )}
         {files.length === 0 && (
           <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Typography variant="h4" color="white">Aucun fichier à afficher</Typography>

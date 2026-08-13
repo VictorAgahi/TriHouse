@@ -15,12 +15,13 @@ export interface DirectoryData {
   included: boolean; // Contrôle pour la case à cocher (Ignorer ou non)
   fileCount: number;
   children: Array<FileData | DirectoryData>;
+  scanned?: boolean;
 }
 
 /**
- * Parcourt récursivement un dossier sélectionné via File System Access API
+ * Parcourt récursivement ou non un dossier sélectionné via File System Access API
  */
-export async function scanDirectory(dirHandle: FileSystemDirectoryHandle): Promise<DirectoryData> {
+export async function scanDirectory(dirHandle: FileSystemDirectoryHandle, recursive = false): Promise<DirectoryData> {
   const children: Array<FileData | DirectoryData> = [];
   let fileCount = 0;
   
@@ -39,9 +40,21 @@ export async function scanDirectory(dirHandle: FileSystemDirectoryHandle): Promi
       }
     } else if (entry.kind === 'directory') {
       if (!entry.name.startsWith('.')) { // Ignore les dossiers cachés
-        const subDir = await scanDirectory(entry as FileSystemDirectoryHandle);
-        fileCount += subDir.fileCount;
-        children.push(subDir);
+        if (recursive) {
+          const subDir = await scanDirectory(entry as FileSystemDirectoryHandle, true);
+          fileCount += subDir.fileCount;
+          children.push(subDir);
+        } else {
+          children.push({
+            handle: entry as FileSystemDirectoryHandle,
+            name: entry.name,
+            kind: 'directory',
+            included: false,
+            fileCount: 0,
+            children: [],
+            scanned: false
+          });
+        }
       }
     }
   }
@@ -50,9 +63,10 @@ export async function scanDirectory(dirHandle: FileSystemDirectoryHandle): Promi
     handle: dirHandle,
     name: dirHandle.name,
     kind: 'directory',
-    included: true, // Inclus par défaut
+    included: false, // Non inclus par défaut
     fileCount,
     children,
+    scanned: true
   };
 }
 

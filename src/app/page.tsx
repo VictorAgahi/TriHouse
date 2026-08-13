@@ -4,6 +4,7 @@ import { get, set } from 'idb-keyval';
 import { Container, Typography, Box, AppBar, Toolbar, Button } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
 import UndoIcon from '@mui/icons-material/Undo';
+import CircularProgress from '@mui/material/CircularProgress';
 import { scanDirectory, DirectoryData, FileData } from '@/utils/fileSystem';
 import { generateSortPlan, executeSortPlan, SortPlan, undoSortPlan } from '@/utils/sorter';
 import ActionButton from '@/components/atoms/ActionButton';
@@ -22,6 +23,7 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
   const [isUndoing, setIsUndoing] = useState(false);
+  const [isScanningTree, setIsScanningTree] = useState(false);
   const [savedHandle, setSavedHandle] = useState<FileSystemDirectoryHandle | null>(null);
 
   // States pour l'InstaViewer Global
@@ -95,16 +97,74 @@ export default function Home() {
   };
 
   const handleToggleFolder = (folderName: string) => {
-    if (rootDirectory && !isSorting && !isComplete) {
+    if (rootDirectory && !isSorting && !isUndoing && !isComplete) {
       setRootDirectory(toggleFolderInclude(rootDirectory, folderName));
     }
   };
 
-  const handlePreSort = () => {
+  const handleSetAllInclusion = (root: DirectoryData, targetHandle: FileSystemDirectoryHandle, include: boolean): DirectoryData => {
+    if (root.handle === targetHandle) {
+      const newChildren = root.children.map(child => {
+        if (child.kind === 'directory') {
+          return { ...child, included: include } as DirectoryData;
+        }
+        return child;
+      });
+      return { ...root, children: newChildren };
+    }
+    const newChildren = root.children.map(child => {
+      if (child.kind === 'directory') {
+        return handleSetAllInclusion(child as DirectoryData, targetHandle, include);
+      }
+      return child;
+    });
+    return { ...root, children: newChildren };
+  };
+
+  const handleSelectAll = (targetHandle: FileSystemDirectoryHandle) => {
+    setRootDirectory(prev => prev ? handleSetAllInclusion(prev, targetHandle, true) : null);
+  };
+
+  const handleDeselectAll = (targetHandle: FileSystemDirectoryHandle) => {
+    setRootDirectory(prev => prev ? handleSetAllInclusion(prev, targetHandle, false) : null);
+  };
+
+  const replaceDirectoryNode = (root: DirectoryData, targetHandle: FileSystemDirectoryHandle, newData: DirectoryData): DirectoryData => {
+    if (root.handle === targetHandle) {
+      return { ...newData, included: root.included };
+    }
+    const newChildren = root.children.map(child => {
+      if (child.kind === 'directory') {
+        return replaceDirectoryNode(child as DirectoryData, targetHandle, newData);
+      }
+      return child;
+    });
+    return { ...root, children: newChildren };
+  };
+
+  const handleLoadFolder = async (dir: DirectoryData) => {
     if (!rootDirectory) return;
-    const plan = generateSortPlan(rootDirectory);
-    setSortPlan(plan);
-    setShowConfirmation(true);
+    try {
+      const scannedDir = await scanDirectory(dir.handle, false);
+      setRootDirectory(prev => prev ? replaceDirectoryNode(prev, dir.handle, scannedDir) : null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePreSort = async () => {
+    if (!rootDirectory) return;
+    setIsScanningTree(true);
+    try {
+      const deepScanned = await scanDirectory(rootDirectory.handle, true);
+      setRootDirectory(deepScanned);
+      const plan = generateSortPlan(deepScanned);
+      setSortPlan(plan);
+      setShowConfirmation(true);
+    } catch (e) {
+      console.error(e);
+    }
+    setIsScanningTree(false);
   };
 
   const handleConfirmSort = async () => {
@@ -150,15 +210,23 @@ export default function Home() {
     return files;
   };
 
-  const handleGlobalShuffle = () => {
+  const handleGlobalShuffle = async () => {
     if (!rootDirectory) return;
-    const allFiles = collectAllFiles(rootDirectory);
-    for (let i = allFiles.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [allFiles[i], allFiles[j]] = [allFiles[j], allFiles[i]];
+    setIsScanningTree(true);
+    try {
+      const deepScanned = await scanDirectory(rootDirectory.handle, true);
+      setRootDirectory(deepScanned);
+      const allFiles = collectAllFiles(deepScanned);
+      for (let i = allFiles.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allFiles[i], allFiles[j]] = [allFiles[j], allFiles[i]];
+      }
+      setGlobalFiles(allFiles);
+      setGlobalViewerOpen(true);
+    } catch (e) {
+      console.error(e);
     }
-    setGlobalFiles(allFiles);
-    setGlobalViewerOpen(true);
+    setIsScanningTree(false);
   };
 
   const handleRefresh = async () => {
@@ -207,7 +275,7 @@ export default function Home() {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="lg" sx={{ flexGrow: 1, pb: 12 }}>
+      <Container maxWidth="xl" sx={{ flexGrow: 1, pb: 24, px: { xs: 2, md: 4, xl: 8 } }}>
         {!rootDirectory ? (
           <Box sx={{ textAlign: 'center', mt: 10 }}>
             <Typography variant="h2" gutterBottom>
@@ -248,7 +316,10 @@ export default function Home() {
           <FileExplorer 
             rootDirectory={rootDirectory} 
             onToggleFolder={handleToggleFolder}
+            onLoadFolder={handleLoadFolder}
             onRefresh={handleRefresh}
+            onSelectAll={handleSelectAll}
+            onDeselectAll={handleDeselectAll}
           />
         )}
       </Container>
@@ -271,17 +342,18 @@ export default function Home() {
             zIndex: 1000
           }}
         >
-          <ActionButton onClick={handlePreSort}>
-            Ranger toutes mes photos par année
+          <ActionButton onClick={handlePreSort} disabled={isScanningTree}>
+            {isScanningTree ? <CircularProgress size={24} sx={{ color: 'white' }} /> : "Ranger toutes mes photos par année"}
           </ActionButton>
           <Button 
             variant="outlined" 
             color="primary" 
             size="large" 
             onClick={handleGlobalShuffle}
+            disabled={isScanningTree}
             sx={{ fontWeight: 'bold', width: '100%', maxWidth: 400, borderRadius: 2, py: 1.5 }}
           >
-            Visionner tout au hasard
+            {isScanningTree ? "Analyse en cours..." : "Visionner tout au hasard"}
           </Button>
         </Box>
       )}

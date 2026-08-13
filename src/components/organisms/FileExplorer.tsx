@@ -12,12 +12,17 @@ import InstaViewer from './InstaViewer';
 interface FileExplorerProps {
   rootDirectory: DirectoryData;
   onToggleFolder: (folderName: string) => void;
+  onLoadFolder: (dir: DirectoryData) => Promise<void>;
   onRefresh: () => void;
+  onSelectAll: (handle: FileSystemDirectoryHandle) => void;
+  onDeselectAll: (handle: FileSystemDirectoryHandle) => void;
 }
 
-export default function FileExplorer({ rootDirectory, onToggleFolder, onRefresh }: FileExplorerProps) {
+export default function FileExplorer({ rootDirectory, onToggleFolder, onLoadFolder, onRefresh, onSelectAll, onDeselectAll }: FileExplorerProps) {
   // Navigation state: stocke uniquement les noms des dossiers traversés (pour éviter les references mortes)
   const [pathNames, setPathNames] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 24;
 
   // Reconstruire le path d'objets DirectoryData à chaque render
   const path = useMemo(() => {
@@ -53,13 +58,22 @@ export default function FileExplorer({ rootDirectory, onToggleFolder, onRefresh 
       .filter(child => child.kind === 'file' && !deletedFiles.has(child.name)) as FileData[];
   }, [currentDir, deletedFiles]);
 
-  const handleNavigateIn = (dir: DirectoryData) => {
-    setPathNames([...pathNames, dir.name]);
+  const [loadingFolder, setLoadingFolder] = useState<string | null>(null);
+
+  const handleNavigateIn = async (dir: DirectoryData) => {
+    if (dir.scanned === false) {
+      setLoadingFolder(dir.name);
+      await onLoadFolder(dir);
+      setLoadingFolder(null);
+    }
+    setPathNames((prev) => [...prev, dir.name]);
+    setPage(1);
   };
 
   const handleNavigateOut = () => {
     if (pathNames.length > 0) {
       setPathNames(pathNames.slice(0, -1));
+      setPage(1);
     }
   };
 
@@ -123,36 +137,48 @@ export default function FileExplorer({ rootDirectory, onToggleFolder, onRefresh 
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-        {!isRoot && (
-          <IconButton onClick={handleNavigateOut} sx={{ mr: 2 }} color="primary" aria-label="Retour">
-            <ArrowBackIcon fontSize="large" />
-          </IconButton>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 4, justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          {!isRoot && (
+            <IconButton onClick={handleNavigateOut} sx={{ mr: 2 }} color="primary" aria-label="Retour">
+              <ArrowBackIcon fontSize="large" />
+            </IconButton>
+          )}
+          <Typography variant="h2">
+            {isRoot ? 'Dossiers trouvés :' : `Contenu de ${currentDir.name}`}
+          </Typography>
+        </Box>
+        
+        {currentDir.children.some(child => child.kind === 'directory') && (
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button variant="outlined" color="primary" onClick={() => onSelectAll(currentDir.handle)} sx={{ fontWeight: 'bold' }}>
+              Tout sélectionner
+            </Button>
+            <Button variant="outlined" color="error" onClick={() => onDeselectAll(currentDir.handle)} sx={{ fontWeight: 'bold' }}>
+              Tout désélectionner
+            </Button>
+          </Box>
         )}
-        <Typography variant="h2">
-          {isRoot ? 'Dossiers trouvés :' : `Contenu de ${currentDir.name}`}
-        </Typography>
       </Box>
 
       <Grid container spacing={3}>
-        {currentDir.children.map((child) => {
-          if (deletedFiles.has(child.name)) return null;
-
+        {currentDir.children.filter(child => !deletedFiles.has(child.name)).slice(0, page * itemsPerPage).map((child) => {
           if (child.kind === 'directory') {
             return (
-              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={child.name}>
+              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3, xl: 2 }} key={child.name}>
                 <FolderCard
                   name={child.name}
                   included={child.included}
                   fileCount={child.fileCount}
                   onToggleInclude={() => onToggleFolder(child.name)}
                   onClick={() => handleNavigateIn(child as DirectoryData)}
+                  isLoading={loadingFolder === child.name}
                 />
               </Grid>
             );
           } else {
             return (
-              <Grid size={{ xs: 12, sm: 6, md: 3 }} key={child.name}>
+              <Grid size={{ xs: 12, sm: 6, md: 3, lg: 2, xl: 2 }} key={child.name}>
                 <PhotoCard
                   name={child.name}
                   fileHandle={child.handle}
@@ -162,12 +188,26 @@ export default function FileExplorer({ rootDirectory, onToggleFolder, onRefresh 
             );
           }
         })}
-        {currentDir.children.length === 0 && (
+        {currentDir.children.filter(child => !deletedFiles.has(child.name)).length === 0 && (
           <Typography variant="body1" sx={{ mt: 4, fontStyle: 'italic', color: 'text.secondary' }}>
             Ce dossier est vide.
           </Typography>
         )}
       </Grid>
+
+      {currentDir.children.filter(child => !deletedFiles.has(child.name)).length > page * itemsPerPage && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            size="large"
+            onClick={() => setPage(prev => prev + 1)}
+            sx={{ fontWeight: 'bold', borderRadius: 4, px: 4 }}
+          >
+            Afficher plus de fichiers ({currentDir.children.filter(child => !deletedFiles.has(child.name)).length - page * itemsPerPage} restants)
+          </Button>
+        </Box>
+      )}
 
       <InstaViewer
         open={viewerOpen}
