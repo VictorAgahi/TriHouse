@@ -116,3 +116,30 @@ export async function getFilePreview(fileHandle: FileSystemFileHandle): Promise<
     return null;
   }
 }
+
+/**
+ * Liste les fichiers (images et vidéos) d'un dossier donné de manière non récursive
+ */
+export async function getFilesInDirectory(dirHandle: FileSystemDirectoryHandle, currentPath: string[] = []): Promise<FileData[]> {
+  const files: FileData[] = [];
+  
+  // @ts-expect-error - File System API types are not fully supported
+  for await (const entry of dirHandle.values()) {
+    if (entry.kind === 'file') {
+      const isPhoto = /\.(jpg|jpeg|png|heic|webp|gif)$/i.test(entry.name);
+      const isVideo = /\.(mp4|mov|avi|mkv)$/i.test(entry.name);
+      if (isPhoto || isVideo) {
+        files.push({
+          handle: entry as FileSystemFileHandle,
+          name: entry.name,
+          kind: 'file',
+          year: null, // On ne parse pas l'année ici
+          parentHandle: dirHandle,
+          folderPath: currentPath
+        });
+      }
+    }
+  }
+  
+  return files;
+}

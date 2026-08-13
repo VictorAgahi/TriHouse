@@ -25,11 +25,14 @@ export default function Home() {
           // @ts-expect-error - missing global type
           const permission = await dirHandle.queryPermission({ mode: 'readwrite' });
           if (permission === 'granted') {
-            const data = await scanDirectory(dirHandle);
+            setIsScanning(true);
+            const data = await scanDirectory(dirHandle, true);
             setRootDirectory(data);
+            setIsScanning(false);
           }
         } catch (e) {
           console.error(e);
+          setIsScanning(false);
         }
       }
     }).catch(console.error);

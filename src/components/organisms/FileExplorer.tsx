@@ -1,9 +1,10 @@
 'use client';
-import { useState, useMemo } from 'react';
-import { Box, Typography, Grid, IconButton, Button } from '@mui/material';
+import { useState, useMemo, useEffect } from 'react';
+import { Box, Typography, Grid, IconButton, Button, CircularProgress } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { DirectoryData } from '@/utils/fileSystem';
+import { DirectoryData, FileData, getFilesInDirectory } from '@/utils/fileSystem';
 import FolderCard from '../molecules/FolderCard';
+import MediaCard from '../molecules/MediaCard';
 
 interface FileExplorerProps {
   rootDirectory: DirectoryData;
@@ -37,9 +38,43 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames, o
   const currentDir = path[path.length - 1];
   const isRoot = path.length === 1;
 
+  const [currentFiles, setCurrentFiles] = useState<FileData[]>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [filePage, setFilePage] = useState(1);
+
+  useEffect(() => {
+    let active = true;
+    if (currentDir) {
+      const loadData = async () => {
+        try {
+          const files = await getFilesInDirectory(currentDir.handle, pathNames);
+          if (active) {
+            setCurrentFiles(files);
+            setIsLoadingFiles(false);
+          }
+        } catch (err) {
+          console.error(err);
+          if (active) setIsLoadingFiles(false);
+        }
+      };
+      
+      setTimeout(() => {
+        if (active) {
+          setIsLoadingFiles(true);
+          setFilePage(1);
+          loadData();
+        }
+      }, 0);
+    }
+    return () => {
+      active = false;
+    };
+  }, [currentDir, pathNames]);
+
   const handleNavigateIn = async (dir: DirectoryData) => {
     setPathNames((prev) => [...prev, dir.name]);
     setPage(1);
+    setFilePage(1);
   };
 
   const handleNavigateOut = () => {
@@ -88,8 +123,18 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames, o
             />
           </Grid>
         ))}
-        {currentDir.children.length === 0 && (
-          <Typography variant="body1" sx={{ mt: 4, fontStyle: 'italic', color: 'text.secondary' }}>
+        {currentFiles.slice(0, filePage * itemsPerPage).map((file) => (
+          <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3, xl: 2 }} key={file.name}>
+            <MediaCard file={file} />
+          </Grid>
+        ))}
+        {isLoadingFiles && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', mt: 4 }}>
+            <CircularProgress />
+          </Box>
+        )}
+        {currentDir.children.length === 0 && currentFiles.length === 0 && !isLoadingFiles && (
+          <Typography variant="body1" sx={{ mt: 4, fontStyle: 'italic', color: 'text.secondary', width: '100%', textAlign: 'center' }}>
             Ce dossier est vide.
           </Typography>
         )}
@@ -105,6 +150,19 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames, o
             sx={{ fontWeight: 'bold', borderRadius: 4, px: 4 }}
           >
             Afficher plus de dossiers ({currentDir.children.length - page * itemsPerPage} restants)
+          </Button>
+        </Box>
+      )}
+      {currentFiles.length > filePage * itemsPerPage && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <Button 
+            variant="contained" 
+            color="secondary" 
+            size="large"
+            onClick={() => setFilePage(prev => prev + 1)}
+            sx={{ fontWeight: 'bold', borderRadius: 4, px: 4 }}
+          >
+            Afficher plus d&apos;images/vidéos ({currentFiles.length - filePage * itemsPerPage} restantes)
           </Button>
         </Box>
       )}
