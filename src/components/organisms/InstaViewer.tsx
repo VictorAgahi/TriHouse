@@ -1,4 +1,4 @@
-import { Dialog, Box, IconButton, Typography, Fab } from '@mui/material';
+import { Dialog, Box, IconButton, Typography, Fab, CircularProgress } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FolderIcon from '@mui/icons-material/Folder';
@@ -21,12 +21,16 @@ interface InstaViewerProps {
 const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (name: string) => void, onExplore: () => void }) => {
   const [url, setUrl] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<{ date?: string, location?: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const isVideo = file.name.match(/\.(mp4|mov|avi)$/i) !== null;
 
   useEffect(() => {
     let active = true;
     getFilePreview(file.handle).then(async u => {
-      if (active) setUrl(u);
+      if (active) {
+        setUrl(u);
+        setIsLoading(false);
+      }
       // Try to parse EXIF
       try {
         const f = await file.handle.getFile();
@@ -66,6 +70,13 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
       position: 'relative',
       bgcolor: 'black'
     }}>
+      {isLoading && (
+        <Box sx={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'white', zIndex: 10 }}>
+          <CircularProgress color="inherit" size={60} sx={{ mb: 2 }} />
+          <Typography variant="h6">Chargement de la {isVideo ? 'vidéo' : 'photo'}...</Typography>
+        </Box>
+      )}
+
       {url && (
         isVideo ? (
           <video src={url} controls style={{ maxWidth: '100%', maxHeight: '100%' }} autoPlay loop />
