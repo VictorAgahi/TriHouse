@@ -212,7 +212,6 @@ export default function Home() {
                 rootDirectory={rootDirectory} 
                 onToggleFolder={handleToggleFolder}
                 onLoadFolder={handleLoadFolder}
-                onRefresh={handleRefresh}
                 onSelectAll={handleSelectAll}
                 onDeselectAll={handleDeselectAll}
               />

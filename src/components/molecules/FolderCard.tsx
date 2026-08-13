@@ -33,7 +33,7 @@ export default function FolderCard({ name, included, fileCount, onToggleInclude,
           }
           label={
             <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-              {included ? 'Inclure dans le tri' : 'Ignorer ce dossier'}
+              {included ? 'Sélectionné' : 'Non sélectionné'}
             </Typography>
           }
           onClick={(e) => e.stopPropagation()}

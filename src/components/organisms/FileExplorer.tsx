@@ -1,22 +1,19 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { Box, Typography, Grid, IconButton, Button, Fab } from '@mui/material';
+import { Box, Typography, Grid, IconButton, Button } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { DirectoryData } from '@/utils/fileSystem';
-import { cleanEmptyDirectories } from '@/utils/sorter';
 import FolderCard from '../molecules/FolderCard';
 
 interface FileExplorerProps {
   rootDirectory: DirectoryData;
   onToggleFolder: (folderName: string) => void;
   onLoadFolder: (dir: DirectoryData) => Promise<void>;
-  onRefresh: () => void;
   onSelectAll: (handle: FileSystemDirectoryHandle) => void;
   onDeselectAll: (handle: FileSystemDirectoryHandle) => void;
 }
 
-export default function FileExplorer({ rootDirectory, onToggleFolder, onLoadFolder, onRefresh, onSelectAll, onDeselectAll }: FileExplorerProps) {
+export default function FileExplorer({ rootDirectory, onToggleFolder, onLoadFolder, onSelectAll, onDeselectAll }: FileExplorerProps) {
   // Navigation state: stocke uniquement les noms des dossiers traversés (pour éviter les references mortes)
   const [pathNames, setPathNames] = useState<string[]>([]);
   const [page, setPage] = useState(1);
@@ -120,22 +117,6 @@ export default function FileExplorer({ rootDirectory, onToggleFolder, onLoadFold
         </Box>
       )}
 
-      <Fab 
-        color="error" 
-        variant="extended" 
-        onClick={async () => {
-          try {
-            await cleanEmptyDirectories(rootDirectory.handle);
-            onRefresh(); // Recharger la vue pour faire disparaître les dossiers
-          } catch (e) {
-            console.error(e);
-          }
-        }}
-        sx={{ position: 'fixed', right: 24, bottom: 24, zIndex: 1000 }}
-      >
-        <DeleteSweepIcon sx={{ mr: 1 }} />
-        Vider dossiers vides
-      </Fab>
     </Box>
   );
 }
