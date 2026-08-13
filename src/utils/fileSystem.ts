@@ -5,7 +5,7 @@ export interface FileData {
   name: string;
   kind: 'file';
   year: string | null;
-  previewUrl?: string; // Utilisé pour les miniatures
+  previewUrl?: string;
 }
 
 export interface DirectoryData {
@@ -14,7 +14,7 @@ export interface DirectoryData {
   kind: 'directory';
   included: boolean; // Contrôle pour la case à cocher (Ignorer ou non)
   fileCount: number;
-  children: Array<FileData | DirectoryData>;
+  children: Array<DirectoryData>;
   scanned?: boolean;
 }
 
@@ -22,7 +22,7 @@ export interface DirectoryData {
  * Parcourt récursivement ou non un dossier sélectionné via File System Access API
  */
 export async function scanDirectory(dirHandle: FileSystemDirectoryHandle, recursive = false): Promise<DirectoryData> {
-  const children: Array<FileData | DirectoryData> = [];
+  const children: Array<DirectoryData> = [];
   let fileCount = 0;
   
   // @ts-expect-error : L'itérateur values() de FileSystemDirectoryHandle est standard mais le type natif TS peut l'ignorer
@@ -31,12 +31,6 @@ export async function scanDirectory(dirHandle: FileSystemDirectoryHandle, recurs
       const isPhotoOrVideo = /\.(jpg|jpeg|png|mp4|mov|avi)$/i.test(entry.name);
       if (isPhotoOrVideo) {
         fileCount++;
-        children.push({
-          handle: entry as FileSystemFileHandle,
-          name: entry.name,
-          kind: 'file',
-          year: null, // Sera extrait plus tard
-        });
       }
     } else if (entry.kind === 'directory') {
       if (!entry.name.startsWith('.')) { // Ignore les dossiers cachés
@@ -68,6 +62,33 @@ export async function scanDirectory(dirHandle: FileSystemDirectoryHandle, recurs
     children,
     scanned: true
   };
+}
+
+/**
+ * Récupère les FileSystemFileHandle uniquement pour les dossiers qui ont été sélectionnés (included: true).
+ */
+export async function getSelectedFilesHandles(dirData: DirectoryData): Promise<FileSystemFileHandle[]> {
+  const handles: FileSystemFileHandle[] = [];
+  
+  if (dirData.included) {
+    // @ts-expect-error - File System API types are not fully supported by default TS
+    for await (const entry of dirData.handle.values()) {
+      if (entry.kind === 'file') {
+        const isPhoto = /\.(jpg|jpeg|png|heic|webp|gif)$/i.test(entry.name);
+        const isVideo = /\.(mp4|mov|avi|mkv)$/i.test(entry.name);
+        if (isPhoto || isVideo) {
+          handles.push(entry as FileSystemFileHandle);
+        }
+      }
+    }
+  }
+  
+  for (const child of dirData.children) {
+    const childHandles = await getSelectedFilesHandles(child);
+    handles.push(...childHandles);
+  }
+  
+  return handles;
 }
 
 /**

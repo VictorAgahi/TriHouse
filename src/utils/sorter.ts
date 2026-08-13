@@ -10,24 +10,31 @@ export interface SortPlan {
 /**
  * Analyse l'arborescence et crée un plan de tri sans modifier les fichiers.
  */
-export function generateSortPlan(dir: DirectoryData, currentPlan?: SortPlan, currentPath: string[] = []): SortPlan {
+export async function generateSortPlan(dir: DirectoryData, currentPlan?: SortPlan, currentPath: string[] = []): Promise<SortPlan> {
   const plan = currentPlan || { totalFiles: 0, filesToMove: [], unknownFiles: [] };
   
   if (!dir.included) return plan;
 
-  for (const child of dir.children) {
-    if (child.kind === 'file') {
-      plan.totalFiles++;
-      const year = extractYearFromFileName(child.name);
-      if (year) {
-        plan.filesToMove.push({ file: child as FileData, targetYear: year, sourceDir: dir.handle, originalPath: currentPath });
-      } else {
-        // Fallback: les fichiers sans date iront dans un dossier "Autres" ou resteront sur place.
-        plan.unknownFiles.push({ file: child as FileData, sourceDir: dir.handle, originalPath: currentPath });
+  // @ts-expect-error - File System API types are not fully supported by default TS
+  for await (const entry of dir.handle.values()) {
+    if (entry.kind === 'file') {
+      const isPhoto = /\.(jpg|jpeg|png|heic|webp|gif)$/i.test(entry.name);
+      const isVideo = /\.(mp4|mov|avi|mkv)$/i.test(entry.name);
+      if (isPhoto || isVideo) {
+        plan.totalFiles++;
+        const year = extractYearFromFileName(entry.name);
+        const fileData = { handle: entry as FileSystemFileHandle, name: entry.name, kind: 'file', year } as FileData;
+        if (year) {
+          plan.filesToMove.push({ file: fileData, targetYear: year, sourceDir: dir.handle, originalPath: currentPath });
+        } else {
+          plan.unknownFiles.push({ file: fileData, sourceDir: dir.handle, originalPath: currentPath });
+        }
       }
-    } else {
-      generateSortPlan(child as DirectoryData, plan, [...currentPath, child.name]);
     }
+  }
+
+  for (const child of dir.children) {
+    await generateSortPlan(child as DirectoryData, plan, [...currentPath, child.name]);
   }
 
   return plan;

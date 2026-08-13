@@ -1,34 +1,18 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { get, set } from 'idb-keyval';
-import { Container, Typography, Box, AppBar, Toolbar, Button } from '@mui/material';
+import { Container, Typography, Box, AppBar, Toolbar, Button, Tabs, Tab } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
-import UndoIcon from '@mui/icons-material/Undo';
-import CircularProgress from '@mui/material/CircularProgress';
-import { scanDirectory, DirectoryData, FileData } from '@/utils/fileSystem';
-import { generateSortPlan, executeSortPlan, SortPlan, undoSortPlan } from '@/utils/sorter';
+import { scanDirectory, DirectoryData } from '@/utils/fileSystem';
 import ActionButton from '@/components/atoms/ActionButton';
 import FileExplorer from '@/components/organisms/FileExplorer';
-import ConfirmationModal from '@/components/organisms/ConfirmationModal';
-import SortingProgress from '@/components/organisms/SortingProgress';
-import InstaViewer from '@/components/organisms/InstaViewer';
+import DiscoverPage from '@/components/organisms/DiscoverPage';
+import SortPage from '@/components/organisms/SortPage';
 
 export default function Home() {
   const [rootDirectory, setRootDirectory] = useState<DirectoryData | null>(null);
-  
-  // States pour le tri
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [sortPlan, setSortPlan] = useState<SortPlan | null>(null);
-  const [isSorting, setIsSorting] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [isComplete, setIsComplete] = useState(false);
-  const [isUndoing, setIsUndoing] = useState(false);
-  const [isScanningTree, setIsScanningTree] = useState(false);
   const [savedHandle, setSavedHandle] = useState<FileSystemDirectoryHandle | null>(null);
-
-  // States pour l'InstaViewer Global
-  const [globalViewerOpen, setGlobalViewerOpen] = useState(false);
-  const [globalFiles, setGlobalFiles] = useState<FileData[]>([]);
+  const [activeTab, setActiveTab] = useState(0);
 
   useEffect(() => {
     get('root-dir-handle').then(async (handle) => {
@@ -97,7 +81,7 @@ export default function Home() {
   };
 
   const handleToggleFolder = (folderName: string) => {
-    if (rootDirectory && !isSorting && !isUndoing && !isComplete) {
+    if (rootDirectory) {
       setRootDirectory(toggleFolderInclude(rootDirectory, folderName));
     }
   };
@@ -152,83 +136,6 @@ export default function Home() {
     }
   };
 
-  const handlePreSort = async () => {
-    if (!rootDirectory) return;
-    setIsScanningTree(true);
-    try {
-      const deepScanned = await scanDirectory(rootDirectory.handle, true);
-      setRootDirectory(deepScanned);
-      const plan = generateSortPlan(deepScanned);
-      setSortPlan(plan);
-      setShowConfirmation(true);
-    } catch (e) {
-      console.error(e);
-    }
-    setIsScanningTree(false);
-  };
-
-  const handleConfirmSort = async () => {
-    if (!sortPlan || !rootDirectory) return;
-    setShowConfirmation(false);
-    setIsSorting(true);
-    setProgress(0);
-    
-    await executeSortPlan(sortPlan, rootDirectory.handle, (prog) => {
-      setProgress(prog);
-    });
-    
-    setIsSorting(false);
-    setIsComplete(true);
-  };
-
-  const handleUndoSort = async () => {
-    if (!sortPlan || !rootDirectory) return;
-    setIsComplete(false);
-    setIsUndoing(true);
-    setProgress(0);
-    
-    await undoSortPlan(sortPlan, rootDirectory.handle, (prog) => {
-      setProgress(prog);
-    });
-    
-    setIsUndoing(false);
-    setSortPlan(null);
-    handleRefresh();
-  };
-
-  const collectAllFiles = (dir: DirectoryData): FileData[] => {
-    let files: FileData[] = [];
-    for (const child of dir.children) {
-      if (child.kind === 'file') {
-        files.push(child);
-      } else {
-        if ((child as DirectoryData).included) {
-          files = files.concat(collectAllFiles(child as DirectoryData));
-        }
-      }
-    }
-    return files;
-  };
-
-  const handleGlobalShuffle = async () => {
-    if (!rootDirectory) return;
-    setIsScanningTree(true);
-    try {
-      const deepScanned = await scanDirectory(rootDirectory.handle, true);
-      setRootDirectory(deepScanned);
-      const allFiles = collectAllFiles(deepScanned);
-      for (let i = allFiles.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [allFiles[i], allFiles[j]] = [allFiles[j], allFiles[i]];
-      }
-      setGlobalFiles(allFiles);
-      setGlobalViewerOpen(true);
-    } catch (e) {
-      console.error(e);
-    }
-    setIsScanningTree(false);
-  };
-
   const handleRefresh = async () => {
     if (rootDirectory) {
       const data = await scanDirectory(rootDirectory.handle);
@@ -245,27 +152,25 @@ export default function Home() {
             TriHouse
           </Typography>
           {rootDirectory && (
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              {sortPlan && isComplete && (
-                <Button 
-                  variant="outlined" 
-                  color="inherit" 
-                  onClick={handleUndoSort}
-                  startIcon={<UndoIcon />}
-                  sx={{ fontWeight: 'bold', borderColor: 'rgba(255,255,255,0.5)' }}
-                >
-                  Annuler le dernier tri
-                </Button>
-              )}
+            <Box sx={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <Tabs 
+                value={activeTab} 
+                onChange={(e, val) => setActiveTab(val)}
+                textColor="inherit"
+                sx={{
+                  '& .MuiTabs-indicator': { backgroundColor: 'white' },
+                  '& .MuiTab-root': { color: 'rgba(255,255,255,0.7)', fontWeight: 'bold', fontSize: '1.1rem' },
+                  '& .Mui-selected': { color: 'white' },
+                }}
+              >
+                <Tab label="Explorateur" />
+                <Tab label="Découverte" />
+                <Tab label="Tri" />
+              </Tabs>
               <Button 
                 variant="contained" 
                 color="error" 
-                onClick={() => {
-                  setRootDirectory(null);
-                  setIsSorting(false);
-                  setIsComplete(false);
-                  setSortPlan(null);
-                }}
+                onClick={() => setRootDirectory(null)}
                 sx={{ fontWeight: 'bold' }}
               >
                 Sortir
@@ -275,7 +180,7 @@ export default function Home() {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="xl" sx={{ flexGrow: 1, pb: 24, px: { xs: 2, md: 4, xl: 8 } }}>
+      <Container maxWidth="xl" sx={{ flexGrow: 1, pb: 8, px: { xs: 2, md: 4, xl: 8 } }}>
         {!rootDirectory ? (
           <Box sx={{ textAlign: 'center', mt: 10 }}>
             <Typography variant="h2" gutterBottom>
@@ -300,85 +205,34 @@ export default function Home() {
               )}
             </Box>
           </Box>
-        ) : isSorting || isUndoing || isComplete ? (
-          <SortingProgress 
-            progress={progress} 
-            isComplete={isComplete} 
-            onReturn={() => {
-              setIsComplete(false);
-              setSortPlan(null);
-              setRootDirectory(null);
-            }} 
-            onUndo={handleUndoSort}
-            isUndoing={isUndoing}
-          />
         ) : (
-          <FileExplorer 
-            rootDirectory={rootDirectory} 
-            onToggleFolder={handleToggleFolder}
-            onLoadFolder={handleLoadFolder}
-            onRefresh={handleRefresh}
-            onSelectAll={handleSelectAll}
-            onDeselectAll={handleDeselectAll}
-          />
+          <>
+            {activeTab === 0 && (
+              <FileExplorer 
+                rootDirectory={rootDirectory} 
+                onToggleFolder={handleToggleFolder}
+                onLoadFolder={handleLoadFolder}
+                onRefresh={handleRefresh}
+                onSelectAll={handleSelectAll}
+                onDeselectAll={handleDeselectAll}
+              />
+            )}
+            {activeTab === 1 && (
+              <DiscoverPage rootDirectory={rootDirectory} />
+            )}
+            {activeTab === 2 && (
+              <SortPage 
+                rootDirectory={rootDirectory} 
+                onRefresh={handleRefresh} 
+                onExit={() => {
+                  setRootDirectory(null);
+                  setActiveTab(0);
+                }} 
+              />
+            )}
+          </>
         )}
       </Container>
-
-      {rootDirectory && !isSorting && !isUndoing && !isComplete && (
-        <Box 
-          sx={{ 
-            position: 'fixed', 
-            bottom: 0, 
-            left: 0, 
-            right: 0, 
-            bgcolor: 'white', 
-            borderTop: '1px solid #e0e0e0',
-            p: 3, 
-            display: 'flex', 
-            flexDirection: 'column',
-            gap: 2,
-            alignItems: 'center',
-            boxShadow: '0 -4px 12px rgba(0,0,0,0.05)',
-            zIndex: 1000
-          }}
-        >
-          <ActionButton onClick={handlePreSort} disabled={isScanningTree}>
-            {isScanningTree ? <CircularProgress size={24} sx={{ color: 'white' }} /> : "Ranger toutes mes photos par année"}
-          </ActionButton>
-          <Button 
-            variant="outlined" 
-            color="primary" 
-            size="large" 
-            onClick={handleGlobalShuffle}
-            disabled={isScanningTree}
-            sx={{ fontWeight: 'bold', width: '100%', maxWidth: 400, borderRadius: 2, py: 1.5 }}
-          >
-            {isScanningTree ? "Analyse en cours..." : "Visionner tout au hasard"}
-          </Button>
-        </Box>
-      )}
-
-      <InstaViewer
-        open={globalViewerOpen}
-        files={globalFiles}
-        initialIndex={0}
-        onClose={() => setGlobalViewerOpen(false)}
-        onDelete={(fileName) => {
-          // Dans le mode global, pour simplifier sans casser le state complexe de FileExplorer, 
-          // on peut retirer de l'affichage local et appeler une suppression. 
-          // On passe par rootDirectory... mais on verra ça plus tard, pour l'instant on enlève juste de globalFiles
-          setGlobalFiles(prev => prev.filter(f => f.name !== fileName));
-        }}
-      />
-
-      {sortPlan && (
-        <ConfirmationModal
-          open={showConfirmation}
-          sortPlan={sortPlan}
-          onConfirm={handleConfirmSort}
-          onCancel={() => setShowConfirmation(false)}
-        />
-      )}
     </Box>
   );
 }
