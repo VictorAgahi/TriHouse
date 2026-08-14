@@ -34,23 +34,25 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
         setUrl(u);
         setIsLoading(false);
       }
-      // Try to parse EXIF
+      // Try to parse EXIF (only for images)
       try {
-        const f = await file.handle.getFile();
-        const parsed = await exifr.parse(f);
-        if (active && parsed) {
-          let loc = '';
-          if (parsed.latitude && parsed.longitude) {
-            loc = `${parsed.latitude.toFixed(4)}, ${parsed.longitude.toFixed(4)}`;
-          }
-          let d = '';
-          if (parsed.DateTimeOriginal) {
-            d = new Date(parsed.DateTimeOriginal).toLocaleDateString('fr-FR', {
-              year: 'numeric', month: 'long', day: 'numeric'
-            });
-          }
-          if (d || loc) {
-            setMetadata({ date: d, location: loc });
+        if (!isVideo) {
+          const f = await file.handle.getFile();
+          const parsed = await exifr.parse(f);
+          if (active && parsed) {
+            let loc = '';
+            if (parsed.latitude && parsed.longitude) {
+              loc = `${parsed.latitude.toFixed(4)}, ${parsed.longitude.toFixed(4)}`;
+            }
+            let d = '';
+            if (parsed.DateTimeOriginal) {
+              d = new Date(parsed.DateTimeOriginal).toLocaleDateString('fr-FR', {
+                year: 'numeric', month: 'long', day: 'numeric'
+              });
+            }
+            if (d || loc) {
+              setMetadata({ date: d, location: loc });
+            }
           }
         }
       } catch {
@@ -60,7 +62,7 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
     return () => {
       active = false;
     };
-  }, [file]);
+  }, [file, isVideo]);
 
   const handleCopy = async () => {
     try {
@@ -201,23 +203,35 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
 export default function InstaViewer({ open, files, initialIndex, onClose, onDelete, onExplore }: InstaViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const isProgrammaticScroll = useRef(false);
 
   useEffect(() => {
-    if (open && containerRef.current && initialIndex >= 0) {
+    if (open && initialIndex >= 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCurrentIndex(initialIndex);
-      // Scroll to initial index
-      setTimeout(() => {
+      isProgrammaticScroll.current = true;
+      
+      // Scroll to initial index with retries to ensure Dialog is fully rendered
+      let retries = 0;
+      const attemptScroll = () => {
         if (containerRef.current) {
           containerRef.current.scrollTo({
             top: initialIndex * window.innerHeight,
             behavior: 'instant'
           });
+          setTimeout(() => { isProgrammaticScroll.current = false; }, 50);
+        } else if (retries < 5) {
+          retries++;
+          setTimeout(attemptScroll, 50);
         }
-      }, 50);
+      };
+      
+      setTimeout(attemptScroll, 10);
     }
   }, [open, initialIndex]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (isProgrammaticScroll.current) return;
     const top = e.currentTarget.scrollTop;
     const index = Math.round(top / window.innerHeight);
     if (index !== currentIndex) {

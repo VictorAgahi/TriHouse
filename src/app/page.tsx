@@ -17,6 +17,14 @@ export default function Home() {
   const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {
+    // 1. Tenter de charger le cache instantanément
+    get('root-dir-cache').then((cache) => {
+      if (cache) {
+        setRootDirectory(cache as DirectoryData);
+      }
+    }).catch(console.error);
+
+    // 2. Vérifier les permissions et lancer le scan en arrière-plan
     get('root-dir-handle').then(async (handle) => {
       if (handle) {
         const dirHandle = handle as FileSystemDirectoryHandle;
@@ -28,6 +36,7 @@ export default function Home() {
             setIsScanning(true);
             const data = await scanDirectory(dirHandle, true);
             setRootDirectory(data);
+            await set('root-dir-cache', data);
             setIsScanning(false);
           }
         } catch (e) {
@@ -47,6 +56,7 @@ export default function Home() {
         if (permission === 'granted') {
           const data = await scanDirectory(savedHandle, true);
           setRootDirectory(data);
+          await set('root-dir-cache', data);
           setIsScanning(false);
           return;
         } else {
@@ -55,6 +65,7 @@ export default function Home() {
           if (request === 'granted') {
             const data = await scanDirectory(savedHandle, true);
             setRootDirectory(data);
+            await set('root-dir-cache', data);
             setIsScanning(false);
             return;
           }
@@ -68,6 +79,7 @@ export default function Home() {
       setSavedHandle(dirHandle);
       const data = await scanDirectory(dirHandle, true);
       setRootDirectory(data);
+      await set('root-dir-cache', data);
     } catch (err) {
       console.error(err);
     }
@@ -127,6 +139,7 @@ export default function Home() {
       setIsScanning(true);
       const data = await scanDirectory(rootDirectory.handle, true);
       setRootDirectory(data);
+      await set('root-dir-cache', data);
       setIsScanning(false);
     }
   };
@@ -136,12 +149,15 @@ export default function Home() {
       <AppBar position="static" elevation={0} sx={{ bgcolor: 'primary.main', mb: 4 }}>
         <Toolbar sx={{ py: 2 }}>
           <HomeIcon sx={{ fontSize: 40, mr: 2, color: 'white' }} />
-          <Typography variant="h1" component="div" sx={{ color: 'white', flexGrow: 1 }}>
+          <Typography variant="h1" component="div" sx={{ color: 'white', flexGrow: 1, display: 'flex', alignItems: 'center' }}>
             TriHouse
             {rootDirectory && (
               <Typography variant="body2" component="span" sx={{ ml: 3, opacity: 0.9 }}>
                 ({rootDirectory.imageCount} image(s), {rootDirectory.videoCount} vidéo(s) au total)
               </Typography>
+            )}
+            {isScanning && (
+              <CircularProgress size={20} sx={{ color: 'white', ml: 2, opacity: 0.7 }} />
             )}
           </Typography>
           {rootDirectory && (

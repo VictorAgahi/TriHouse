@@ -107,7 +107,7 @@ export async function getSelectedFilesHandles(dirData: DirectoryData, currentPat
 export async function getFilePreview(fileHandle: FileSystemFileHandle): Promise<string | null> {
   try {
     const file = await fileHandle.getFile();
-    if (file.type.startsWith('image/')) {
+    if (file.type.startsWith('image/') || file.type.startsWith('video/') || file.type === '') {
       return URL.createObjectURL(file);
     }
     return null;
