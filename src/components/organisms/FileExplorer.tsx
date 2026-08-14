@@ -1,7 +1,8 @@
 'use client';
 import { useState, useMemo, useEffect } from 'react';
-import { Box, Typography, Grid, IconButton, Button, CircularProgress } from '@mui/material';
+import { Box, Typography, Grid, Button, CircularProgress, TextField, InputAdornment } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import SearchIcon from '@mui/icons-material/Search';
 import { DirectoryData, FileData, getFilesInDirectory } from '@/utils/fileSystem';
 import FolderCard from '../molecules/FolderCard';
 import MediaCard from '../molecules/MediaCard';
@@ -11,12 +12,9 @@ interface FileExplorerProps {
   rootDirectory: DirectoryData;
   pathNames: string[];
   setPathNames: React.Dispatch<React.SetStateAction<string[]>>;
-  onToggleFolder: (folderName: string) => void;
-  onSelectAll: (handle: FileSystemDirectoryHandle) => void;
-  onDeselectAll: (handle: FileSystemDirectoryHandle) => void;
 }
 
-export default function FileExplorer({ rootDirectory, pathNames, setPathNames, onToggleFolder, onSelectAll, onDeselectAll }: FileExplorerProps) {
+export default function FileExplorer({ rootDirectory, pathNames, setPathNames }: FileExplorerProps) {
   const [page, setPage] = useState(1);
   const itemsPerPage = 24;
 
@@ -44,6 +42,7 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames, o
   const [filePage, setFilePage] = useState(1);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -84,6 +83,7 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames, o
     if (pathNames.length > 0) {
       setPathNames(pathNames.slice(0, -1));
       setPage(1);
+      setSearchQuery('');
     }
   };
 
@@ -96,46 +96,60 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames, o
     }
   };
 
+  const filteredFolders = currentDir.children.filter(child => child.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredFiles = currentFiles.filter(file => file.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 4, justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, mb: 4 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
           {!isRoot && (
-            <IconButton onClick={handleNavigateOut} sx={{ mr: 2 }} color="primary" aria-label="Retour">
-              <ArrowBackIcon fontSize="large" />
-            </IconButton>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={handleNavigateOut}
+              startIcon={<ArrowBackIcon sx={{ fontSize: 32 }} />}
+              sx={{ fontSize: '1.2rem', fontWeight: 'bold', py: 1.5, px: 3, borderRadius: 3 }}
+            >
+              Retour au dossier précédent
+            </Button>
           )}
-          <Typography variant="h2">
-            {isRoot ? 'Dossiers trouvés :' : `Contenu de ${currentDir.name}`}
+          <Typography variant="h2" sx={{ fontSize: '2rem', fontWeight: 'bold', color: 'primary.main' }}>
+            {isRoot ? 'Vos Dossiers :' : `Dossier : ${currentDir.name}`}
           </Typography>
         </Box>
         
-        {currentDir.children.some(child => child.kind === 'directory') && (
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button variant="outlined" color="primary" onClick={() => onSelectAll(currentDir.handle)} sx={{ fontWeight: 'bold' }}>
-              Tout sélectionner
-            </Button>
-            <Button variant="outlined" color="error" onClick={() => onDeselectAll(currentDir.handle)} sx={{ fontWeight: 'bold' }}>
-              Tout désélectionner
-            </Button>
-          </Box>
-        )}
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="Entrez le nom d'un dossier ou d'une photo pour chercher..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+                </InputAdornment>
+              ),
+              sx: { fontSize: '1.5rem', py: 1, borderRadius: 4, bgcolor: 'white' }
+            }
+          }}
+        />
       </Box>
 
       <Grid container spacing={3}>
-        {currentDir.children.slice(0, page * itemsPerPage).map((child) => (
+        {filteredFolders.slice(0, page * itemsPerPage).map((child) => (
           <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3, xl: 2 }} key={child.name}>
             <FolderCard
               name={child.name}
-              included={child.included}
               imageCount={child.imageCount}
               videoCount={child.videoCount}
-              onToggleInclude={() => onToggleFolder(child.name)}
               onClick={() => handleNavigateIn(child as DirectoryData)}
             />
           </Grid>
         ))}
-        {currentFiles.slice(0, filePage * itemsPerPage).map((file, index) => (
+        {filteredFiles.slice(0, filePage * itemsPerPage).map((file, index) => (
           <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3, xl: 2 }} key={file.name}>
             <MediaCard 
               file={file} 
@@ -151,36 +165,36 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames, o
             <CircularProgress />
           </Box>
         )}
-        {currentDir.children.length === 0 && currentFiles.length === 0 && !isLoadingFiles && (
-          <Typography variant="body1" sx={{ mt: 4, fontStyle: 'italic', color: 'text.secondary', width: '100%', textAlign: 'center' }}>
-            Ce dossier est vide.
+        {filteredFolders.length === 0 && filteredFiles.length === 0 && !isLoadingFiles && (
+          <Typography variant="body1" sx={{ mt: 4, fontStyle: 'italic', color: 'text.secondary', width: '100%', textAlign: 'center', fontSize: '1.5rem' }}>
+            Aucun résultat trouvé.
           </Typography>
         )}
       </Grid>
 
-      {currentDir.children.length > page * itemsPerPage && (
+      {filteredFolders.length > page * itemsPerPage && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
           <Button 
             variant="contained" 
             color="primary" 
             size="large"
             onClick={() => setPage(prev => prev + 1)}
-            sx={{ fontWeight: 'bold', borderRadius: 4, px: 4 }}
+            sx={{ fontSize: '1.5rem', fontWeight: 'bold', borderRadius: 4, px: 6, py: 2 }}
           >
-            Afficher plus de dossiers ({currentDir.children.length - page * itemsPerPage} restants)
+            Afficher plus de dossiers ({filteredFolders.length - page * itemsPerPage} restants)
           </Button>
         </Box>
       )}
-      {currentFiles.length > filePage * itemsPerPage && (
+      {filteredFiles.length > filePage * itemsPerPage && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
           <Button 
             variant="contained" 
             color="secondary" 
             size="large"
             onClick={() => setFilePage(prev => prev + 1)}
-            sx={{ fontWeight: 'bold', borderRadius: 4, px: 4 }}
+            sx={{ fontSize: '1.5rem', fontWeight: 'bold', borderRadius: 4, px: 6, py: 2 }}
           >
-            Afficher plus d&apos;images/vidéos ({currentFiles.length - filePage * itemsPerPage} restantes)
+            Afficher plus d&apos;images/vidéos ({filteredFiles.length - filePage * itemsPerPage} restantes)
           </Button>
         </Box>
       )}
@@ -188,7 +202,7 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames, o
       {/* Vue plein écran pour les images/vidéos */}
       <InstaViewer
         open={viewerOpen}
-        files={currentFiles}
+        files={filteredFiles}
         initialIndex={viewerIndex}
         onClose={() => setViewerOpen(false)}
         onDelete={handleDeleteFile}

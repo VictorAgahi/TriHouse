@@ -7,7 +7,6 @@ import { scanDirectory, DirectoryData } from '@/utils/fileSystem';
 import ActionButton from '@/components/atoms/ActionButton';
 import FileExplorer from '@/components/organisms/FileExplorer';
 import DiscoverPage from '@/components/organisms/DiscoverPage';
-import SortPage from '@/components/organisms/SortPage';
 
 export default function Home() {
   const [rootDirectory, setRootDirectory] = useState<DirectoryData | null>(null);
@@ -86,52 +85,6 @@ export default function Home() {
     setIsScanning(false);
   };
 
-  const toggleFolderInclude = (dirData: DirectoryData, targetName: string): DirectoryData => {
-    if (dirData.name === targetName) {
-      return { ...dirData, included: !dirData.included };
-    }
-    const newChildren = dirData.children.map(child => {
-      if (child.kind === 'directory') {
-        return toggleFolderInclude(child as DirectoryData, targetName);
-      }
-      return child;
-    });
-    return { ...dirData, children: newChildren };
-  };
-
-  const handleToggleFolder = (folderName: string) => {
-    if (rootDirectory) {
-      setRootDirectory(toggleFolderInclude(rootDirectory, folderName));
-    }
-  };
-
-  const handleSetAllInclusion = (root: DirectoryData, targetHandle: FileSystemDirectoryHandle, include: boolean): DirectoryData => {
-    if (root.handle === targetHandle) {
-      const newChildren = root.children.map(child => {
-        if (child.kind === 'directory') {
-          return { ...child, included: include } as DirectoryData;
-        }
-        return child;
-      });
-      return { ...root, children: newChildren };
-    }
-    const newChildren = root.children.map(child => {
-      if (child.kind === 'directory') {
-        return handleSetAllInclusion(child as DirectoryData, targetHandle, include);
-      }
-      return child;
-    });
-    return { ...root, children: newChildren };
-  };
-
-  const handleSelectAll = (targetHandle: FileSystemDirectoryHandle) => {
-    setRootDirectory(prev => prev ? handleSetAllInclusion(prev, targetHandle, true) : null);
-  };
-
-  const handleDeselectAll = (targetHandle: FileSystemDirectoryHandle) => {
-    setRootDirectory(prev => prev ? handleSetAllInclusion(prev, targetHandle, false) : null);
-  };
-
   // onLoadFolder removed as directories are now deeply scanned on first load
 
   const handleRefresh = async () => {
@@ -174,7 +127,6 @@ export default function Home() {
               >
                 <Tab label="Explorateur" />
                 <Tab label="Découverte" />
-                <Tab label="Tri" />
               </Tabs>
               <Button 
                 variant="contained" 
@@ -219,9 +171,6 @@ export default function Home() {
                 rootDirectory={rootDirectory} 
                 pathNames={explorerPath}
                 setPathNames={setExplorerPath}
-                onToggleFolder={handleToggleFolder}
-                onSelectAll={handleSelectAll}
-                onDeselectAll={handleDeselectAll}
               />
             )}
             {activeTab === 1 && (
@@ -231,16 +180,6 @@ export default function Home() {
                   setExplorerPath(path);
                   setActiveTab(0);
                 }}
-              />
-            )}
-            {activeTab === 2 && (
-              <SortPage 
-                rootDirectory={rootDirectory} 
-                onRefresh={handleRefresh} 
-                onExit={() => {
-                  setRootDirectory(null);
-                  setActiveTab(0);
-                }} 
               />
             )}
           </>
