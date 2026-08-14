@@ -1,4 +1,4 @@
-import { Dialog, Box, IconButton, Typography, Fab, CircularProgress } from '@mui/material';
+import { Dialog, Box, IconButton, Typography, Fab, CircularProgress, Snackbar } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FolderIcon from '@mui/icons-material/Folder';
@@ -6,6 +6,7 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { FileData, getFilePreview } from '@/utils/fileSystem';
 import { useEffect, useState, useRef } from 'react';
 import exifr from 'exifr';
@@ -16,13 +17,14 @@ interface InstaViewerProps {
   initialIndex: number;
   onClose: () => void;
   onDelete: (fileName: string) => void;
-  onExplore: (file: FileData) => void;
+  onExplore?: (file: FileData) => void;
 }
 
-const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (name: string) => void, onExplore: (file: FileData) => void }) => {
+const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (name: string) => void, onExplore?: (file: FileData) => void }) => {
   const [url, setUrl] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<{ date?: string, location?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [copySuccess, setCopySuccess] = useState(false);
   const isVideo = file.name.match(/\.(mp4|mov|avi)$/i) !== null;
 
   useEffect(() => {
@@ -59,6 +61,47 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
       active = false;
     };
   }, [file]);
+
+  const handleCopy = async () => {
+    try {
+      const f = await file.handle.getFile();
+      
+      if (f.type === 'image/png') {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': f })
+        ]);
+        setCopySuccess(true);
+        return;
+      }
+      
+      // Conversion vers PNG via Canvas pour la copie
+      const img = new Image();
+      const objUrl = URL.createObjectURL(f);
+      img.src = objUrl;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0);
+      
+      canvas.toBlob(async (blob) => {
+        if (blob) {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob })
+          ]);
+          setCopySuccess(true);
+        }
+        URL.revokeObjectURL(objUrl);
+      }, 'image/png');
+    } catch (err) {
+      console.error('Erreur lors de la copie', err);
+    }
+  };
 
   return (
     <Box sx={{ 
@@ -126,15 +169,31 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
         alignItems: 'flex-end',
         zIndex: 10
       }}>
-        <Fab color="primary" variant="extended" onClick={() => onExplore(file)}>
-          <FolderIcon sx={{ mr: 1 }} />
-          Explorer
-        </Fab>
+        {!isVideo && (
+          <Fab color="info" variant="extended" onClick={handleCopy}>
+            <ContentCopyIcon sx={{ mr: 1 }} />
+            Copier
+          </Fab>
+        )}
+        {onExplore && (
+          <Fab color="primary" variant="extended" onClick={() => onExplore(file)}>
+            <FolderIcon sx={{ mr: 1 }} />
+            Explorer
+          </Fab>
+        )}
         <Fab color="error" variant="extended" onClick={() => onDelete(file.name)}>
           <DeleteIcon sx={{ mr: 1 }} />
           Supprimer
         </Fab>
       </Box>
+
+      <Snackbar
+        open={copySuccess}
+        autoHideDuration={3000}
+        onClose={() => setCopySuccess(false)}
+        message="Image copiée dans le presse-papier !"
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Box>
   );
 };

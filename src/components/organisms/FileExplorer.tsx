@@ -5,6 +5,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { DirectoryData, FileData, getFilesInDirectory } from '@/utils/fileSystem';
 import FolderCard from '../molecules/FolderCard';
 import MediaCard from '../molecules/MediaCard';
+import InstaViewer from './InstaViewer';
 
 interface FileExplorerProps {
   rootDirectory: DirectoryData;
@@ -41,6 +42,8 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames, o
   const [currentFiles, setCurrentFiles] = useState<FileData[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [filePage, setFilePage] = useState(1);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -84,6 +87,15 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames, o
     }
   };
 
+  const handleDeleteFile = async (fileName: string) => {
+    try {
+      await currentDir.handle.removeEntry(fileName);
+      setCurrentFiles(prev => prev.filter(f => f.name !== fileName));
+    } catch (err) {
+      console.error("Erreur lors de la suppression de " + fileName, err);
+    }
+  };
+
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 4, justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
@@ -123,9 +135,15 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames, o
             />
           </Grid>
         ))}
-        {currentFiles.slice(0, filePage * itemsPerPage).map((file) => (
+        {currentFiles.slice(0, filePage * itemsPerPage).map((file, index) => (
           <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3, xl: 2 }} key={file.name}>
-            <MediaCard file={file} />
+            <MediaCard 
+              file={file} 
+              onClick={() => {
+                setViewerIndex(index);
+                setViewerOpen(true);
+              }}
+            />
           </Grid>
         ))}
         {isLoadingFiles && (
@@ -167,6 +185,14 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames, o
         </Box>
       )}
 
+      {/* Vue plein écran pour les images/vidéos */}
+      <InstaViewer
+        open={viewerOpen}
+        files={currentFiles}
+        initialIndex={viewerIndex}
+        onClose={() => setViewerOpen(false)}
+        onDelete={handleDeleteFile}
+      />
     </Box>
   );
 }
