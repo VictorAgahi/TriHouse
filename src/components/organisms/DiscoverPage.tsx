@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Box, Typography, Button, CircularProgress } from '@mui/material';
-import { DirectoryData, getSelectedFilesHandles, FileData } from '@/utils/fileSystem';
+import { DirectoryData, getRandomFilesSample, FileData } from '@/utils/fileSystem';
 import InstaViewer from './InstaViewer';
 
 interface DiscoverPageProps {
@@ -17,14 +17,9 @@ export default function DiscoverPage({ rootDirectory, onGoToExplorer }: Discover
   const handleShuffle = async () => {
     setIsScanning(true);
     try {
-      const handles = await getSelectedFilesHandles(rootDirectory);
-      // Shuffle the handles
-      for (let i = handles.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [handles[i], handles[j]] = [handles[j], handles[i]];
-      }
+      const sampleHandles = await getRandomFilesSample(rootDirectory, 50); // Echantillon de 50 médias
       
-      const filesData: FileData[] = handles.map(h => ({
+      const filesData: FileData[] = sampleHandles.map(h => ({
         handle: h.handle,
         name: h.handle.name,
         kind: 'file',
@@ -64,7 +59,7 @@ export default function DiscoverPage({ rootDirectory, onGoToExplorer }: Discover
         Découverte Aléatoire
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 6 }}>
-        Redécouvrez vos souvenirs oubliés. Le visionnage se fera uniquement parmi les dossiers que vous avez sélectionnés dans l&apos;Explorateur.
+        Redécouvrez vos souvenirs oubliés. Le visionnage vous présentera un échantillon aléatoire de 50 photos/vidéos tirées de tous vos dossiers.
       </Typography>
       
       <Button 

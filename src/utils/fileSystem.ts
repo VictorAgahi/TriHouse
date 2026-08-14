@@ -75,30 +75,94 @@ export async function scanDirectory(dirHandle: FileSystemDirectoryHandle, recurs
 }
 
 /**
- * Récupère les FileSystemFileHandle uniquement pour les dossiers qui ont été sélectionnés (included: true).
+ * Récupère un échantillon aléatoire de fichiers (images/vidéos) dans toute l'arborescence
+ * sans avoir à relire tous les dossiers, en utilisant les compteurs pré-calculés.
  */
-export async function getSelectedFilesHandles(dirData: DirectoryData, currentPath: string[] = []): Promise<{ handle: FileSystemFileHandle, parentHandle: FileSystemDirectoryHandle, folderPath: string[] }[]> {
-  const handles: { handle: FileSystemFileHandle, parentHandle: FileSystemDirectoryHandle, folderPath: string[] }[] = [];
+export async function getRandomFilesSample(rootData: DirectoryData, sampleSize: number): Promise<{ handle: FileSystemFileHandle, parentHandle: FileSystemDirectoryHandle, folderPath: string[] }[]> {
+  const totalFiles = rootData.imageCount + rootData.videoCount;
+  if (totalFiles === 0) return [];
+
+  interface FlatDir {
+    dir: DirectoryData;
+    path: string[];
+    count: number;
+    cumulativeCount: number;
+  }
   
-  if (dirData.included) {
-    // @ts-expect-error - File System API types are not fully supported by default TS
-    for await (const entry of dirData.handle.values()) {
+  const flatDirs: FlatDir[] = [];
+  let currentCumulative = 0;
+  
+  const flatten = (dir: DirectoryData, currentPath: string[]) => {
+    const childrenCount = dir.children.reduce((acc, child) => acc + child.imageCount + child.videoCount, 0);
+    const countInThisDir = dir.imageCount + dir.videoCount - childrenCount;
+    
+    if (countInThisDir > 0) {
+      currentCumulative += countInThisDir;
+      flatDirs.push({ dir, path: currentPath, count: countInThisDir, cumulativeCount: currentCumulative });
+    }
+    
+    for (const child of dir.children) {
+      flatten(child, [...currentPath, child.name]);
+    }
+  };
+  
+  flatten(rootData, []);
+  
+  const targetSize = Math.min(sampleSize, totalFiles);
+  const selectedIndices = new Set<number>();
+  // Attention: si targetSize est très proche de totalFiles, la boucle while peut être longue, mais ici sampleSize est petit (ex: 50).
+  while (selectedIndices.size < targetSize) {
+    selectedIndices.add(Math.floor(Math.random() * totalFiles));
+  }
+  
+  const indicesByDir = new Map<FlatDir, number[]>();
+  for (const index of selectedIndices) {
+    const flatDir = flatDirs.find(fd => index < fd.cumulativeCount);
+    if (flatDir) {
+      const localIndex = index - (flatDir.cumulativeCount - flatDir.count);
+      if (!indicesByDir.has(flatDir)) {
+        indicesByDir.set(flatDir, []);
+      }
+      indicesByDir.get(flatDir)!.push(localIndex);
+    }
+  }
+  
+  const results: { handle: FileSystemFileHandle, parentHandle: FileSystemDirectoryHandle, folderPath: string[] }[] = [];
+  
+  for (const [flatDir, localIndices] of indicesByDir.entries()) {
+    const filesInDir: FileSystemFileHandle[] = [];
+    // @ts-expect-error - File System API types are not fully supported
+    for await (const entry of flatDir.dir.handle.values()) {
       if (entry.kind === 'file') {
         const isPhoto = /\.(jpg|jpeg|png|heic|webp|gif)$/i.test(entry.name);
         const isVideo = /\.(mp4|mov|avi|mkv)$/i.test(entry.name);
         if (isPhoto || isVideo) {
-          handles.push({ handle: entry as FileSystemFileHandle, parentHandle: dirData.handle, folderPath: currentPath });
+          filesInDir.push(entry as FileSystemFileHandle);
         }
+      }
+    }
+    
+    // Trier pour avoir un index prédictible
+    filesInDir.sort((a, b) => a.name.localeCompare(b.name));
+    
+    for (const localIndex of localIndices) {
+      if (filesInDir[localIndex]) {
+        results.push({
+          handle: filesInDir[localIndex],
+          parentHandle: flatDir.dir.handle,
+          folderPath: flatDir.path
+        });
       }
     }
   }
   
-  for (const child of dirData.children) {
-    const childHandles = await getSelectedFilesHandles(child, [...currentPath, child.name]);
-    handles.push(...childHandles);
+  // Mélanger le résultat final
+  for (let i = results.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [results[i], results[j]] = [results[j], results[i]];
   }
   
-  return handles;
+  return results;
 }
 
 /**
