@@ -7,6 +7,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import { FileData, getFilePreview } from '@/utils/fileSystem';
 import { useEffect, useState, useRef } from 'react';
 import exifr from 'exifr';
@@ -19,9 +20,10 @@ interface InstaViewerProps {
   onDelete: (fileName: string) => void;
   onExplore?: (file: FileData) => void;
   onFetchMore?: () => void;
+  onMoveRequest?: (file: FileData) => void;
 }
 
-const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (name: string) => void, onExplore?: (file: FileData) => void }) => {
+const MediaSlide = ({ file, onDelete, onExplore, onMoveRequest }: { file: FileData, onDelete: (name: string) => void, onExplore?: (file: FileData) => void, onMoveRequest?: (file: FileData) => void }) => {
   const [url, setUrl] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<{ date?: string, location?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -133,10 +135,32 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
         )
       )}
 
+      {/* Localisation (Chemin) en haut à gauche */}
+      {file.folderPath && file.folderPath.length > 0 && (
+        <Box sx={{
+          position: 'absolute',
+          top: 20,
+          left: 20,
+          bgcolor: 'rgba(0,0,0,0.6)',
+          p: 1.5,
+          borderRadius: 2,
+          color: 'white',
+          zIndex: 10,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          <FolderIcon fontSize="small" color="primary" />
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            /{file.folderPath.join('/')}
+          </Typography>
+        </Box>
+      )}
+
       {metadata && (
         <Box sx={{ 
           position: 'absolute', 
-          top: 80, 
+          top: (file.folderPath && file.folderPath.length > 0) ? 80 : 20, 
           left: 20, 
           bgcolor: 'rgba(0,0,0,0.6)', 
           p: 2, 
@@ -158,6 +182,21 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
               <Typography variant="body2">{metadata.location}</Typography>
             </Box>
           )}
+        </Box>
+      )}
+
+      {/* Bouton de déplacement en bas à gauche */}
+      {onMoveRequest && (
+        <Box sx={{
+          position: 'absolute',
+          bottom: 40,
+          left: 24,
+          zIndex: 10
+        }}>
+          <Fab color="warning" variant="extended" onClick={() => onMoveRequest(file)}>
+            <DriveFileMoveIcon sx={{ mr: 1 }} />
+            Déplacer la photo vers...
+          </Fab>
         </Box>
       )}
 
@@ -201,7 +240,7 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
   );
 };
 
-export default function InstaViewer({ open, files, initialIndex, onClose, onDelete, onExplore, onFetchMore }: InstaViewerProps) {
+export default function InstaViewer({ open, files, initialIndex, onClose, onDelete, onExplore, onFetchMore, onMoveRequest }: InstaViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const isProgrammaticScroll = useRef(false);
@@ -323,7 +362,7 @@ export default function InstaViewer({ open, files, initialIndex, onClose, onDele
           <>
             <Box sx={{ height: `${Math.max(0, currentIndex - 2) * 100}vh` }} />
             {files.slice(Math.max(0, currentIndex - 2), currentIndex + 3).map((file) => (
-              <MediaSlide key={file.name} file={file} onDelete={onDelete} onExplore={onExplore} />
+              <MediaSlide key={file.name} file={file} onDelete={onDelete} onExplore={onExplore} onMoveRequest={onMoveRequest} />
             ))}
             <Box sx={{ height: `${Math.max(0, files.length - 1 - (currentIndex + 2)) * 100}vh` }} />
           </>

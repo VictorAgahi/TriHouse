@@ -3,6 +3,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { Box, Typography, Grid, Button, CircularProgress, TextField, InputAdornment } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
+import FolderIcon from '@mui/icons-material/Folder';
+import { Dialog, DialogTitle, DialogContent, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
 import { DirectoryData, FileData, getFilesInDirectory, saveDroppedFile } from '@/utils/fileSystem';
 import FolderCard from '../molecules/FolderCard';
 import MediaCard from '../molecules/MediaCard';
@@ -45,6 +47,27 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames }:
   const [searchQuery, setSearchQuery] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  
+  const [fileToMove, setFileToMove] = useState<FileData | null>(null);
+  const [moveSearchQuery, setMoveSearchQuery] = useState('');
+  const [isMoving, setIsMoving] = useState(false);
+
+  // Aplatir l'arborescence pour la recherche dans la modale de déplacement
+  const allFolders = useMemo(() => {
+    const list: { dir: DirectoryData, path: string[] }[] = [];
+    const traverse = (dir: DirectoryData, path: string[]) => {
+      list.push({ dir, path });
+      for (const child of dir.children) {
+        if (child.kind === 'directory') {
+          traverse(child as DirectoryData, [...path, child.name]);
+        }
+      }
+    };
+    // Ne pas inclure la racine si on veut forcer le rangement dans des sous-dossiers, 
+    // ou l'inclure avec le nom "Racine". On l'inclut pour flexibilité.
+    traverse(rootDirectory, [rootDirectory.name]);
+    return list;
+  }, [rootDirectory]);
 
   useEffect(() => {
     let active = true;
@@ -144,6 +167,38 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames }:
       setIsUploading(false);
     }
   };
+
+  const handleConfirmMove = async (targetDir: DirectoryData) => {
+    if (!fileToMove) return;
+    setIsMoving(true);
+    try {
+      // 1. Lire le fichier source
+      const file = await fileToMove.handle.getFile();
+      // 2. Créer le nouveau fichier dans la destination
+      const newHandle = await targetDir.handle.getFileHandle(file.name, { create: true });
+      const writable = await newHandle.createWritable();
+      await writable.write(file);
+      await writable.close();
+      
+      // 3. Supprimer de l'emplacement d'origine
+      const sourceParent = fileToMove.parentHandle || currentDir.handle;
+      await sourceParent.removeEntry(file.name);
+      
+      // 4. Mettre à jour l'état local
+      setCurrentFiles(prev => prev.filter(f => f.name !== file.name));
+      
+      setFileToMove(null);
+      setMoveSearchQuery('');
+    } catch (err) {
+      console.error("Erreur lors du déplacement", err);
+    }
+    setIsMoving(false);
+  };
+
+  const filteredMoveFolders = allFolders.filter(f => 
+    f.dir !== currentDir && // Ne pas proposer le dossier actuel
+    f.path.join('/').toLowerCase().includes(moveSearchQuery.toLowerCase())
+  );
 
   return (
     <Box 
@@ -308,7 +363,77 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames }:
         initialIndex={viewerIndex}
         onClose={() => setViewerOpen(false)}
         onDelete={handleDeleteFile}
+        onMoveRequest={(file) => setFileToMove(file)}
       />
+
+      {/* Modal de Déplacement */}
+      <Dialog 
+        open={!!fileToMove} 
+        onClose={() => !isMoving && setFileToMove(null)}
+        maxWidth="sm"
+        fullWidth
+        sx={{ '& .MuiDialog-paper': { borderRadius: 4, p: 2, minHeight: '60vh' } }}
+      >
+        <DialogTitle>
+          <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'primary.main', mb: 2 }}>
+            Déplacer &quot;{fileToMove?.name}&quot;
+          </Typography>
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Tapez l'endroit où vous voulez déplacer..."
+            value={moveSearchQuery}
+            onChange={(e) => setMoveSearchQuery(e.target.value)}
+            disabled={isMoving}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="primary" />
+                  </InputAdornment>
+                ),
+                sx: { fontSize: '1.2rem', borderRadius: 3 }
+              }
+            }}
+          />
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {isMoving ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 4 }}>
+              <CircularProgress size={60} sx={{ mb: 2 }} />
+              <Typography variant="h6">Déplacement en cours...</Typography>
+            </Box>
+          ) : (
+            <List>
+              {filteredMoveFolders.slice(0, 50).map(({ dir, path }) => (
+                <ListItem key={path.join('/')} disablePadding>
+                  <ListItemButton 
+                    onClick={() => handleConfirmMove(dir)}
+                    sx={{ borderRadius: 2, mb: 1, border: '1px solid #eee' }}
+                  >
+                    <ListItemIcon>
+                      <FolderIcon color="primary" fontSize="large" />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary={dir.name}
+                      secondary={path.slice(0, -1).join('/')}
+                      slotProps={{
+                        primary: { variant: 'h6', sx: { fontWeight: 'bold' } },
+                        secondary: { variant: 'body2' }
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+              {filteredMoveFolders.length === 0 && (
+                <Typography variant="body1" sx={{ textAlign: 'center', mt: 4, fontStyle: 'italic' }}>
+                  Aucun dossier trouvé.
+                </Typography>
+              )}
+            </List>
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }
