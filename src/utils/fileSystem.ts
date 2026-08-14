@@ -207,3 +207,35 @@ export async function getFilesInDirectory(dirHandle: FileSystemDirectoryHandle, 
   
   return files;
 }
+
+/**
+ * Sauvegarde un fichier (File) issu d'un glisser-déposer dans le dossier cible
+ */
+export async function saveDroppedFile(targetDirHandle: FileSystemDirectoryHandle, file: File, currentPath: string[] = []): Promise<FileData | null> {
+  const isPhoto = /\.(jpg|jpeg|png|heic|webp|gif)$/i.test(file.name);
+  const isVideo = /\.(mp4|mov|avi|mkv)$/i.test(file.name);
+  
+  if (!isPhoto && !isVideo) {
+    return null;
+  }
+  
+  try {
+    const newHandle = await targetDirHandle.getFileHandle(file.name, { create: true });
+    
+    const writable = await newHandle.createWritable();
+    await writable.write(file);
+    await writable.close();
+    
+    return {
+      handle: newHandle,
+      name: newHandle.name,
+      kind: 'file',
+      year: null,
+      parentHandle: targetDirHandle,
+      folderPath: currentPath
+    };
+  } catch (error) {
+    console.error("Erreur lors de la sauvegarde de", file.name, error);
+    return null;
+  }
+}

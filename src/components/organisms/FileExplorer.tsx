@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Box, Typography, Grid, Button, CircularProgress, TextField, InputAdornment } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
-import { DirectoryData, FileData, getFilesInDirectory } from '@/utils/fileSystem';
+import { DirectoryData, FileData, getFilesInDirectory, saveDroppedFile } from '@/utils/fileSystem';
 import FolderCard from '../molecules/FolderCard';
 import MediaCard from '../molecules/MediaCard';
 import InstaViewer from './InstaViewer';
@@ -43,6 +43,8 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames }:
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -110,8 +112,91 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames }:
   
   const filteredFiles = currentFiles.filter(file => file.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setIsUploading(true);
+      const newFiles: FileData[] = [];
+      
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        const file = e.dataTransfer.files[i];
+        const savedFile = await saveDroppedFile(currentDir.handle, file, pathNames);
+        if (savedFile) {
+          newFiles.push(savedFile);
+        }
+      }
+      
+      if (newFiles.length > 0) {
+        setCurrentFiles(prev => [...prev, ...newFiles]);
+      }
+      setIsUploading(false);
+    }
+  };
+
   return (
-    <Box>
+    <Box 
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      sx={{ 
+        position: 'relative', 
+        minHeight: '60vh',
+        border: isDragging ? '4px dashed' : 'none',
+        borderColor: 'primary.main',
+        borderRadius: 4,
+        p: isDragging ? 2 : 0,
+        transition: 'all 0.3s ease'
+      }}
+    >
+      {isDragging && (
+        <Box sx={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          bgcolor: 'rgba(25, 118, 210, 0.1)',
+          zIndex: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 4,
+          pointerEvents: 'none'
+        }}>
+          <Typography variant="h3" color="primary" sx={{ fontWeight: 'bold' }}>
+            Déposez vos photos/vidéos ici !
+          </Typography>
+        </Box>
+      )}
+
+      {isUploading && (
+        <Box sx={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          bgcolor: 'rgba(255, 255, 255, 0.8)',
+          zIndex: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 4
+        }}>
+          <CircularProgress size={80} sx={{ mb: 4 }} />
+          <Typography variant="h4" color="primary" sx={{ fontWeight: 'bold' }}>
+            Copie des fichiers en cours...
+          </Typography>
+        </Box>
+      )}
+
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, mb: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
           {!isRoot && (
