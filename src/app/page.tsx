@@ -87,15 +87,6 @@ export default function Home() {
 
   // onLoadFolder removed as directories are now deeply scanned on first load
 
-  const handleRefresh = async () => {
-    if (rootDirectory) {
-      setIsScanning(true);
-      const data = await scanDirectory(rootDirectory.handle, true);
-      setRootDirectory(data);
-      await set('root-dir-cache', data);
-      setIsScanning(false);
-    }
-  };
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>

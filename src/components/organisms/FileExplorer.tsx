@@ -73,11 +73,6 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames }:
     };
   }, [currentDir, pathNames]);
 
-  const handleNavigateIn = async (dir: DirectoryData) => {
-    setPathNames((prev) => [...prev, dir.name]);
-    setPage(1);
-    setFilePage(1);
-  };
 
   const handleNavigateOut = () => {
     if (pathNames.length > 0) {
@@ -96,7 +91,23 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames }:
     }
   };
 
-  const filteredFolders = currentDir.children.filter(child => child.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const getMatchingFolders = (dir: DirectoryData, query: string, currentRelativePath: string[] = []): { dir: DirectoryData, path: string[] }[] => {
+    const matches: { dir: DirectoryData, path: string[] }[] = [];
+    for (const child of dir.children) {
+      const childDir = child as DirectoryData;
+      const childPath = [...currentRelativePath, child.name];
+      if (child.name.toLowerCase().includes(query)) {
+        matches.push({ dir: childDir, path: childPath });
+      }
+      matches.push(...getMatchingFolders(childDir, query, childPath));
+    }
+    return matches;
+  };
+
+  const filteredFolders = searchQuery 
+    ? getMatchingFolders(currentDir, searchQuery.toLowerCase()) 
+    : currentDir.children.map(child => ({ dir: child as DirectoryData, path: [child.name] }));
+  
   const filteredFiles = currentFiles.filter(file => file.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
@@ -139,13 +150,19 @@ export default function FileExplorer({ rootDirectory, pathNames, setPathNames }:
       </Box>
 
       <Grid container spacing={3}>
-        {filteredFolders.slice(0, page * itemsPerPage).map((child) => (
-          <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3, xl: 2 }} key={child.name}>
+        {filteredFolders.slice(0, page * itemsPerPage).map(({ dir, path }) => (
+          <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3, xl: 2 }} key={path.join('/')}>
             <FolderCard
-              name={child.name}
-              imageCount={child.imageCount}
-              videoCount={child.videoCount}
-              onClick={() => handleNavigateIn(child as DirectoryData)}
+              name={dir.name}
+              subtitle={path.length > 1 ? `Dans: ${path.slice(0, -1).join('/')}` : undefined}
+              imageCount={dir.imageCount}
+              videoCount={dir.videoCount}
+              onClick={() => {
+                setPathNames(prev => [...prev, ...path]);
+                setPage(1);
+                setFilePage(1);
+                setSearchQuery('');
+              }}
             />
           </Grid>
         ))}

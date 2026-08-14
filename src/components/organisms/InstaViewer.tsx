@@ -125,7 +125,7 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
 
       {url && (
         isVideo ? (
-          <video src={url} controls style={{ maxWidth: '100%', maxHeight: '100%' }} autoPlay loop />
+          <video src={url} controls preload="metadata" style={{ maxWidth: '100%', maxHeight: '100%' }} loop />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt={file.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
