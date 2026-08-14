@@ -11,6 +11,7 @@ interface DiscoverPageProps {
 
 export default function DiscoverPage({ rootDirectory, onGoToExplorer }: DiscoverPageProps) {
   const [isScanning, setIsScanning] = useState(false);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [shuffledFiles, setShuffledFiles] = useState<FileData[]>([]);
   const [viewerOpen, setViewerOpen] = useState(false);
 
@@ -34,6 +35,26 @@ export default function DiscoverPage({ rootDirectory, onGoToExplorer }: Discover
       console.error(e);
     }
     setIsScanning(false);
+  };
+
+  const handleFetchMore = async () => {
+    if (isFetchingMore || isScanning) return;
+    setIsFetchingMore(true);
+    try {
+      const moreHandles = await getRandomFilesSample(rootDirectory, 50);
+      const newFiles: FileData[] = moreHandles.map(h => ({
+        handle: h.handle,
+        name: h.handle.name,
+        kind: 'file',
+        year: null,
+        parentHandle: h.parentHandle,
+        folderPath: h.folderPath
+      }));
+      setShuffledFiles(prev => [...prev, ...newFiles]);
+    } catch (e) {
+      console.error(e);
+    }
+    setIsFetchingMore(false);
   };
 
   const handleDelete = async (fileName: string) => {
@@ -81,6 +102,7 @@ export default function DiscoverPage({ rootDirectory, onGoToExplorer }: Discover
         onClose={() => setViewerOpen(false)}
         onDelete={handleDelete}
         onExplore={handleExplore}
+        onFetchMore={handleFetchMore}
       />
     </Box>
   );

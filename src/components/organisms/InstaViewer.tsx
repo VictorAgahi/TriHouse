@@ -18,6 +18,7 @@ interface InstaViewerProps {
   onClose: () => void;
   onDelete: (fileName: string) => void;
   onExplore?: (file: FileData) => void;
+  onFetchMore?: () => void;
 }
 
 const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (name: string) => void, onExplore?: (file: FileData) => void }) => {
@@ -200,7 +201,7 @@ const MediaSlide = ({ file, onDelete, onExplore }: { file: FileData, onDelete: (
   );
 };
 
-export default function InstaViewer({ open, files, initialIndex, onClose, onDelete, onExplore }: InstaViewerProps) {
+export default function InstaViewer({ open, files, initialIndex, onClose, onDelete, onExplore, onFetchMore }: InstaViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const isProgrammaticScroll = useRef(false);
@@ -236,6 +237,9 @@ export default function InstaViewer({ open, files, initialIndex, onClose, onDele
     const index = Math.round(top / window.innerHeight);
     if (index !== currentIndex) {
       setCurrentIndex(index);
+      if (onFetchMore && index >= files.length - 3) {
+        onFetchMore();
+      }
     }
   };
 
